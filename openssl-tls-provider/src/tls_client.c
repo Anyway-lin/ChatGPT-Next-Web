@@ -114,7 +114,7 @@ int create_tcp_connection(const char *host, int port) {
 // 初始化SSL上下文
 SSL_CTX *create_ssl_context(OSSL_LIB_CTX *libctx) {
     SSL_CTX *ctx;
-    EVP_PKEY *tee_private_key = NULL;
+    EVP_PKEY *tee_key_ref = NULL;
     
     log_message("INFO", "创建SSL上下文");
     
@@ -144,35 +144,34 @@ SSL_CTX *create_ssl_context(OSSL_LIB_CTX *libctx) {
         return NULL;
     }
     
-    // TEE模式：使用TEE Provider构建的私钥
-    log_message("INFO", "TEE模式：使用TEE Provider构建的私钥");
+    // *** TEE模式：使用TEE密钥引用，私钥永不离开TEE环境 ***
+    log_message("INFO", "TEE模式：创建TEE密钥引用（私钥保护在TEE中）");
     
-    // 从TEE provider获取构建的私钥
-    tee_private_key = tee_provider_get_private_key();
-    if (!tee_private_key) {
-        handle_openssl_error("无法获取TEE构建的私钥");
+    // 创建与TEE provider关联的密钥引用
+    tee_key_ref = tee_provider_create_key_reference(libctx);
+    if (!tee_key_ref) {
+        handle_openssl_error("无法创建TEE密钥引用");
         SSL_CTX_free(ctx);
         return NULL;
     }
     
-    // 注意：OpenSSL会自动使用与私钥关联的provider进行签名操作
-    log_message("INFO", "TEE Provider将通过私钥关联自动使用");
+    log_message("INFO", "TEE密钥引用创建成功（不含私钥数据）");
     
-    // 使用TEE构建的私钥
-    if (SSL_CTX_use_PrivateKey(ctx, tee_private_key) <= 0) {
-        handle_openssl_error("无法设置TEE私钥");
-        EVP_PKEY_free(tee_private_key);
+    // 使用TEE密钥引用（这将强制OpenSSL调用我们的TEE签名函数）
+    if (SSL_CTX_use_PrivateKey(ctx, tee_key_ref) <= 0) {
+        handle_openssl_error("无法设置TEE密钥引用");
+        EVP_PKEY_free(tee_key_ref);
         SSL_CTX_free(ctx);
         return NULL;
     }
     
-    // 释放私钥引用（SSL_CTX已经持有引用）
-    EVP_PKEY_free(tee_private_key);
+    // 释放密钥引用（SSL_CTX已经持有引用）
+    EVP_PKEY_free(tee_key_ref);
     
-    // 验证私钥和证书匹配（这里会跳过实际验证，因为TEE私钥是基于证书构建的）
-    log_message("INFO", "TEE模式：跳过私钥证书匹配验证（TEE私钥基于证书构建）");
+    // 注意：跳过私钥证书匹配验证，因为TEE模式下私钥数据不可见
+    log_message("INFO", "TEE模式：跳过私钥证书匹配验证（私钥数据保护在TEE中）");
     
-    log_message("INFO", "TEE模式：私钥操作将由TEE Provider完成");
+    log_message("INFO", "TEE模式：签名操作将强制调用TEE Provider");
     
     return ctx;
 }
@@ -345,9 +344,9 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
-    // 设置TEE Provider的证书路径并构建私钥
+    // 设置TEE Provider的证书路径和密钥ID（不加载私钥到内存）
     tee_provider_set_certificate_path(client_cert);
-    log_message("INFO", "TEE Provider已根据客户端证书构建私钥");
+    log_message("INFO", "TEE Provider已配置TEE密钥ID（私钥保护在TEE中）");
     
     // 创建SSL上下文
     ssl_ctx = create_ssl_context(libctx);
