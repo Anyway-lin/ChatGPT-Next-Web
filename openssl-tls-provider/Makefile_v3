@@ -1,0 +1,108 @@
+# TEE Provider V3 关键修复版本 - Makefile
+
+# 编译器和标志
+CC = gcc
+CFLAGS = -Wall -Wextra -fPIC -g -O0
+LDFLAGS = -shared
+LIBS = -lssl -lcrypto
+
+# 目录
+SRC_DIR = src
+BUILD_DIR = build
+CERTS_DIR = certs
+
+# V3 特定文件
+TEE_PROVIDER_V3_SRC = $(SRC_DIR)/tee_provider_v3_fix.c
+TEE_PROVIDER_V3_LIB = libtee_provider_v3_fix.so
+TEST_V3_SRC = $(SRC_DIR)/test_v3_simple.c
+
+# 目标文件
+TEE_PROVIDER_V3_TARGET = $(BUILD_DIR)/$(TEE_PROVIDER_V3_LIB)
+TEST_V3_TARGET = $(BUILD_DIR)/test_v3_simple
+
+# 默认目标：编译V3版本和测试程序
+all: $(BUILD_DIR) $(TEE_PROVIDER_V3_TARGET) $(TEST_V3_TARGET)
+
+# 创建构建目录
+$(BUILD_DIR):
+	mkdir -p $(BUILD_DIR)
+
+# 编译TEE Provider V3共享库
+$(TEE_PROVIDER_V3_TARGET): $(TEE_PROVIDER_V3_SRC) | $(BUILD_DIR)
+	@echo "编译TEE Provider V3关键修复版本..."
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $@ $< $(LIBS)
+	@echo "TEE Provider V3编译完成: $@"
+
+# 编译V3测试程序
+$(TEST_V3_TARGET): $(TEST_V3_SRC) $(TEE_PROVIDER_V3_TARGET)
+	@echo "编译TEE Provider V3测试程序..."
+	$(CC) $(CFLAGS) -o $@ $< -L$(BUILD_DIR) -ltee_provider_v3_fix $(LIBS)
+	@echo "V3测试程序编译完成: $@"
+
+# 运行关键测试
+test: $(TEST_V3_TARGET)
+	@echo "=== 运行TEE Provider V3关键修复验证 ==="
+	@echo "检查证书文件..."
+	@ls -la $(CERTS_DIR)/ || echo "⚠️  证书目录不存在，请先生成证书"
+	@echo ""
+	@echo "设置库路径并运行测试..."
+	export LD_LIBRARY_PATH=$(BUILD_DIR):$$LD_LIBRARY_PATH && ./$(TEST_V3_TARGET)
+
+# 生成证书（如果需要）
+certs:
+	@echo "生成测试证书..."
+	@mkdir -p $(CERTS_DIR)
+	# 生成CA私钥
+	openssl genrsa -out $(CERTS_DIR)/ca.key 2048
+	# 生成CA证书
+	openssl req -new -x509 -key $(CERTS_DIR)/ca.key -out $(CERTS_DIR)/ca.pem -days 365 -subj "/CN=Test CA"
+	# 生成服务器私钥
+	openssl genrsa -out $(CERTS_DIR)/server.key 2048
+	# 生成服务器证书请求
+	openssl req -new -key $(CERTS_DIR)/server.key -out $(CERTS_DIR)/server.csr -subj "/CN=localhost"
+	# 签发服务器证书
+	openssl x509 -req -in $(CERTS_DIR)/server.csr -CA $(CERTS_DIR)/ca.pem -CAkey $(CERTS_DIR)/ca.key -CAcreateserial -out $(CERTS_DIR)/server.pem -days 365
+	# 生成客户端私钥
+	openssl genrsa -out $(CERTS_DIR)/client.key 2048
+	# 生成客户端证书请求
+	openssl req -new -key $(CERTS_DIR)/client.key -out $(CERTS_DIR)/client.csr -subj "/CN=Test Client"
+	# 签发客户端证书
+	openssl x509 -req -in $(CERTS_DIR)/client.csr -CA $(CERTS_DIR)/ca.pem -CAkey $(CERTS_DIR)/ca.key -CAcreateserial -out $(CERTS_DIR)/client.pem -days 365
+	# 清理临时文件
+	rm -f $(CERTS_DIR)/*.csr $(CERTS_DIR)/*.srl
+	@echo "证书生成完成"
+
+# 完整验证：生成证书 + 编译 + 测试
+verify: certs all test
+
+# 清理构建文件
+clean:
+	@echo "清理V3构建文件..."
+	rm -f $(BUILD_DIR)/$(TEE_PROVIDER_V3_LIB)
+	rm -f $(TEST_V3_TARGET)
+	@echo "V3构建文件清理完成"
+
+# 清理所有文件（包括证书）
+clean-all: clean
+	@echo "清理所有文件..."
+	rm -rf $(BUILD_DIR)
+	rm -rf $(CERTS_DIR)
+	@echo "所有文件清理完成"
+
+# 显示使用说明
+help:
+	@echo "TEE Provider V3 关键修复版本 - 使用说明"
+	@echo ""
+	@echo "目标："
+	@echo "  all      - 编译TEE Provider V3和测试程序"
+	@echo "  test     - 运行关键修复验证测试"
+	@echo "  certs    - 生成测试证书"
+	@echo "  verify   - 完整验证（生成证书+编译+测试）"
+	@echo "  clean    - 清理构建文件"
+	@echo "  clean-all- 清理所有文件（包括证书）"
+	@echo "  help     - 显示此帮助信息"
+	@echo ""
+	@echo "快速开始："
+	@echo "  make verify  # 一键完整验证"
+
+.PHONY: all test certs verify clean clean-all help
