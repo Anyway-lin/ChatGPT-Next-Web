@@ -1,0 +1,45 @@
+# OpenSSL配置文件 - 支持TEE Provider
+# 使用方法: OPENSSL_CONF=tee_openssl.cnf openssl ...
+
+# 全局配置
+openssl_conf = openssl_init
+
+[openssl_init]
+providers = provider_sect
+
+[provider_sect]
+# TEE Provider - 处理TEE存储的密钥
+tee = tee_sect
+# Default Provider - 处理标准算法和操作  
+default = default_sect
+
+[tee_sect]
+# TEE Provider标识
+identity = tee
+# Provider模块路径 (相对于当前目录或绝对路径)
+module = /workspace/tee_provider.so
+# 激活provider
+activate = 1
+
+[default_sect]
+# 激活默认provider
+activate = 1
+
+# 默认算法属性
+[default_properties]
+# 默认使用default provider，除非明确指定
+default_properties = provider=default
+
+# 可选：为特定应用配置
+[engine_section]
+# 保持为空，因为我们使用的是Provider而非Engine
+
+# SSL/TLS配置
+[ssl_sect]
+system_default = ssl_default_sect
+
+[ssl_default_sect]
+MinProtocol = TLSv1.2
+MaxProtocol = TLSv1.3
+Ciphersuites = TLS_AES_256_GCM_SHA384:TLS_CHACHA20_POLY1305_SHA256:TLS_AES_128_GCM_SHA256
+CipherString = ECDHE+AESGCM:ECDHE+CHACHA20:DHE+AESGCM:DHE+CHACHA20:!aNULL:!MD5:!DSS
