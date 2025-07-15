@@ -3,9 +3,9 @@
 
 # 编译器和标志
 CC = gcc
-CFLAGS = -Wall -Wextra -O2 -g -std=c99 -D_GNU_SOURCE
+CFLAGS = -Wall -Wextra -O2 -g -std=c99 -D_GNU_SOURCE -static-libgcc
 INCLUDES = -I./lib/include
-LIBS = -lssl -lcrypto -lpthread
+LIBS = -lssl -lcrypto -lpthread -ldl
 
 # 目录定义
 LIB_SRC_DIR = lib/src
@@ -70,30 +70,30 @@ $(BUILD_DIR)/%.o: $(LIB_SRC_DIR)/%.c
 	$(CC) $(CFLAGS) $(INCLUDES) -fPIC -c $< -o $@
 
 # 构建服务器程序
-$(KEYLESS_SERVER): $(SERVER_DIR)/keyless_tls_server.c $(LIBRARY)
+$(KEYLESS_SERVER): $(SERVER_DIR)/keyless_tls_server.c $(LIBRARY) | setup-dirs
 	@echo "🔨 Building keyless TLS server: $@"
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $< -L$(BUILD_DIR) -lkeyless $(LIBS)
 	@echo "✅ Keyless TLS server built successfully"
 
 # 构建客户端程序
-$(SIMPLE_CLIENT): $(DEMO_DIR)/simple_client.c
+$(SIMPLE_CLIENT): $(DEMO_DIR)/simple_client.c | setup-dirs
 	@echo "🔨 Building simple client: $@"
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $< $(LIBS)
 	@echo "✅ Simple client built successfully"
 
 # 构建演示程序
-$(KEYLESS_DEMO): $(DEMO_DIR)/keyless_demo.c $(LIBRARY)
+$(KEYLESS_DEMO): $(DEMO_DIR)/keyless_demo.c $(LIBRARY) | setup-dirs
 	@echo "🔨 Building keyless demo: $@"
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $< -L$(BUILD_DIR) -lkeyless $(LIBS)
 	@echo "✅ Keyless demo built successfully"
 
 # 构建测试程序
-$(BUILD_DIR)/%: $(TESTS_DIR)/%.c $(LIBRARY)
+$(BUILD_DIR)/%: $(TESTS_DIR)/%.c $(LIBRARY) | setup-dirs
 	@echo "🔨 Building test program: $@"
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $< -L$(BUILD_DIR) -lkeyless $(LIBS)
 
 # 构建示例程序
-$(BUILD_DIR)/%: $(EXAMPLES_DIR)/%.c $(LIBRARY)
+$(BUILD_DIR)/%: $(EXAMPLES_DIR)/%.c $(LIBRARY) | setup-dirs
 	@echo "🔨 Building example program: $@"
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $< -L$(BUILD_DIR) -lkeyless $(LIBS)
 
