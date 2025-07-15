@@ -32,9 +32,10 @@ CLIENT_V2_BIN = $(BUILD_DIR)/tls_client_v2
 SERVER_BIN = $(BUILD_DIR)/tls_server
 TEST_BIN = $(BUILD_DIR)/test_tee_signature
 TEST_ADV_BIN = $(BUILD_DIR)/test_tee_signature_advanced
+TEST_EXPORT_BIN = $(BUILD_DIR)/test_key_export
 
 # 默认目标
-all: $(PROVIDER_LIB) $(PROVIDER_V2_LIB) $(CLIENT_BIN) $(CLIENT_V2_BIN) $(SERVER_BIN)
+all: $(PROVIDER_LIB) $(PROVIDER_V2_LIB) $(CLIENT_BIN) $(CLIENT_V2_BIN) $(SERVER_BIN) $(TEST_EXPORT_BIN)
 
 # 测试目标（包含签名测试）
 test-all: $(PROVIDER_LIB) $(CLIENT_BIN) $(SERVER_BIN) $(TEST_BIN) $(TEST_ADV_BIN)
@@ -89,6 +90,12 @@ $(TEST_ADV_BIN): $(TEST_ADV_SRC) $(PROVIDER_SRC) | $(BUILD_DIR)
 	@echo "编译高级TEE签名测试程序..."
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(TEST_ADV_SRC) $(PROVIDER_SRC) $(LDFLAGS) $(LIBS)
 	@echo "高级TEE签名测试程序编译完成: $@"
+
+# 编译密钥导出测试程序
+$(BUILD_DIR)/test_key_export: $(SRC_DIR)/test_key_export.c $(BUILD_DIR)/$(TEE_PROVIDER_V2_LIB)
+	@echo "编译密钥导出测试程序..."
+	$(CC) $(CFLAGS) -o $@ $< -L$(BUILD_DIR) -ltee_provider_v2 $(LIBS)
+	@echo "密钥导出测试程序编译完成: $@"
 
 # 生成证书
 certs: $(SCRIPTS_DIR)/generate_certs.sh

@@ -227,11 +227,13 @@ static int tee_keymgmt_has(const void *keydata, int selection) {
     }
     
     // TEE模式：私钥在TEE中，公钥参数可用
+    // 检查私钥能力
     if (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) {
         tee_log("✅ 确认：TEE中有私钥");
         return 1;
     }
     
+    // 检查公钥能力
     if (selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) {
         int has_pubkey = (ctx->n != NULL && ctx->e != NULL);
         tee_log("%s 公钥参数: %s", has_pubkey ? "✅" : "❌", 
@@ -239,11 +241,20 @@ static int tee_keymgmt_has(const void *keydata, int selection) {
         return has_pubkey;
     }
     
+    // 检查密钥对能力
     if (selection & OSSL_KEYMGMT_SELECT_KEYPAIR) {
         // TEE模式：我们同时有私钥（在TEE中）和公钥参数
         int has_keypair = (ctx->n != NULL && ctx->e != NULL);
         tee_log("✅ TEE密钥对：私钥在TEE中，公钥参数%s", has_keypair ? "可用" : "不可用");
         return has_keypair;
+    }
+    
+    // 处理组合选择：如果同时询问私钥和公钥
+    if ((selection & (OSSL_KEYMGMT_SELECT_PRIVATE_KEY | OSSL_KEYMGMT_SELECT_PUBLIC_KEY)) == 
+        (OSSL_KEYMGMT_SELECT_PRIVATE_KEY | OSSL_KEYMGMT_SELECT_PUBLIC_KEY)) {
+        int has_both = (ctx->n != NULL && ctx->e != NULL);
+        tee_log("✅ 完整密钥对：私钥在TEE中，公钥参数%s", has_both ? "可用" : "不可用");
+        return has_both;
     }
     
     tee_log("✅ 其他选择支持");
@@ -388,11 +399,19 @@ static int tee_keymgmt_export(void *keydata, int selection,
         }
     }
     
-    // 处理私钥选择：我们不能导出私钥，但可以提供元信息
+    // 处理私钥选择：TEE Provider的正确方法
     if (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) {
-        // 对于TEE Provider，我们不导出实际的私钥参数，
-        // 但我们可以提供密钥大小等元信息来表明私钥存在
-        tee_log("✅ 私钥在TEE中（不导出实际私钥参数）");
+        // 对于TEE Provider，我们不导出私钥参数，但必须让OpenSSL知道私钥存在
+        // 关键：确保公钥参数总是可用的
+        if (ctx->n && ctx->e) {
+            // 当请求私钥时，我们仍然提供公钥参数
+            // 这样OpenSSL就知道密钥是完整的，只是私钥部分在TEE中
+            if (OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_N, ctx->n) == 1 &&
+                OSSL_PARAM_BLD_push_BN(bld, OSSL_PKEY_PARAM_RSA_E, ctx->e) == 1) {
+                tee_log("✅ 提供公钥参数（私钥在TEE中安全保护）");
+            }
+        }
+        tee_log("✅ 私钥请求处理：私钥保护在TEE中，已提供公钥参数");
     }
     
     // 导出密钥大小信息
@@ -433,7 +452,17 @@ static const OSSL_PARAM *tee_keymgmt_import_types(int selection) {
 
 // 关键函数：获取可导出的参数类型
 static const OSSL_PARAM *tee_keymgmt_export_types(int selection) {
-    static const OSSL_PARAM export_types[] = {
+    // 为TEE Provider定义完整的导出类型，包括私钥参数类型
+    static const OSSL_PARAM export_types_full[] = {
+        OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_N, NULL, 0),        // 公钥参数N
+        OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_E, NULL, 0),        // 公钥参数E
+        OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_D, NULL, 0),        // 私钥参数D（TEE中）
+        OSSL_PARAM_int(OSSL_PKEY_PARAM_BITS, NULL),            // 密钥大小
+        OSSL_PARAM_END
+    };
+    
+    // 只包含公钥和通用参数的类型
+    static const OSSL_PARAM export_types_public[] = {
         OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_N, NULL, 0),
         OSSL_PARAM_BN(OSSL_PKEY_PARAM_RSA_E, NULL, 0),
         OSSL_PARAM_int(OSSL_PKEY_PARAM_BITS, NULL),
@@ -442,10 +471,16 @@ static const OSSL_PARAM *tee_keymgmt_export_types(int selection) {
     
     tee_log("🔑 密钥管理：查询可导出参数类型 (selection=%d)", selection);
     
-    // 对于TEE Provider，我们可以导出公钥参数和密钥大小信息
-    // 私钥不能导出，但我们支持私钥的元信息
-    if (selection & (OSSL_KEYMGMT_SELECT_PUBLIC_KEY | OSSL_KEYMGMT_SELECT_PRIVATE_KEY)) {
-        return export_types;
+    // 如果请求包含私钥，返回完整的参数类型列表
+    if (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) {
+        tee_log("✅ 声明支持私钥参数类型（虽然私钥在TEE中保护）");
+        return export_types_full;
+    }
+    
+    // 否则返回公钥参数类型
+    if (selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) {
+        tee_log("✅ 声明支持公钥参数类型");
+        return export_types_public;
     }
     
     return NULL;
