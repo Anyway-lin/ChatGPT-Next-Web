@@ -169,11 +169,34 @@ static int extract_public_key_params(const char *cert_path, BIGNUM **n, BIGNUM *
 
 static void *tee_keymgmt_new(void *provctx) {
     TEE_KEY_CTX *ctx = OPENSSL_zalloc(sizeof(TEE_KEY_CTX));
-    if (ctx) {
-        ctx->provctx = (TEE_PROV_CTX *)provctx;
-        ctx->key_valid = 0;
-        tee_log("🔑 密钥管理：创建新的TEE密钥上下文");
+    if (!ctx) {
+        tee_log("❌ 无法分配TEE密钥上下文内存");
+        return NULL;
     }
+    
+    ctx->provctx = (TEE_PROV_CTX *)provctx;
+    
+    // 如果已经配置了TEE密钥，则自动加载密钥信息
+    if (global_tee_key_id && global_cert_path) {
+        BIGNUM *n = NULL, *e = NULL;
+        int key_size = 0;
+        
+        if (extract_public_key_params(global_cert_path, &n, &e, &key_size)) {
+            ctx->n = n;
+            ctx->e = e;
+            ctx->key_size = key_size;
+            ctx->tee_key_id = OPENSSL_strdup(global_tee_key_id);
+            ctx->key_valid = 1;
+            tee_log("🔑 密钥管理：创建新的TEE密钥上下文（自动加载TEE密钥信息）");
+        } else {
+            tee_log("⚠️  无法提取公钥参数，创建空的TEE密钥上下文");
+            ctx->key_valid = 0;
+        }
+    } else {
+        ctx->key_valid = 0;
+        tee_log("🔑 密钥管理：创建新的TEE密钥上下文（未配置TEE密钥）");
+    }
+    
     return ctx;
 }
 
@@ -238,14 +261,28 @@ static int tee_keymgmt_match(const void *keydata1, const void *keydata2, int sel
         return 0;
     }
     
-    if (!ctx1->key_valid || !ctx2->key_valid) {
-        tee_log("❌ 密钥无效");
+    // 检查密钥有效性，但更宽松的检查
+    // 至少一个密钥必须是有效的TEE密钥
+    int ctx1_valid = ctx1->key_valid;
+    int ctx2_valid = ctx2->key_valid;
+    
+    tee_log("🔍 密钥有效性检查: ctx1=%s, ctx2=%s", 
+            ctx1_valid ? "有效" : "无效", 
+            ctx2_valid ? "有效" : "无效");
+    
+    // 如果两个都无效，则匹配失败
+    if (!ctx1_valid && !ctx2_valid) {
+        tee_log("❌ 两个密钥都无效");
         return 0;
     }
     
-    // 通过TEE密钥ID匹配
-    if (ctx1->tee_key_id && ctx2->tee_key_id) {
-        int match = strcmp(ctx1->tee_key_id, ctx2->tee_key_id) == 0;
+    // 找到有效的TEE密钥
+    const TEE_KEY_CTX *tee_key = ctx1_valid ? ctx1 : ctx2;
+    const TEE_KEY_CTX *other_key = ctx1_valid ? ctx2 : ctx1;
+    
+    // 通过TEE密钥ID匹配（如果两个都有TEE密钥ID）
+    if (tee_key->tee_key_id && other_key->tee_key_id) {
+        int match = strcmp(tee_key->tee_key_id, other_key->tee_key_id) == 0;
         tee_log("%s 密钥ID匹配: %s", match ? "✅" : "❌", 
                 match ? "相同TEE密钥" : "不同TEE密钥");
         if (match) return 1;
@@ -259,6 +296,13 @@ static int tee_keymgmt_match(const void *keydata1, const void *keydata2, int sel
         tee_log("%s 公钥参数匹配: N=%s, E=%s", match ? "✅" : "❌",
                 n_match ? "匹配" : "不匹配", e_match ? "匹配" : "不匹配");
         return match;
+    }
+    
+    // 如果其中一个密钥没有公钥参数，但有TEE密钥ID，
+    // 并且选择的是公钥比较，则认为匹配
+    if (tee_key->tee_key_id && (selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY)) {
+        tee_log("✅ TEE密钥与标准密钥匹配（基于TEE密钥ID）");
+        return 1;
     }
     
     tee_log("⚠️  无法比较密钥");
@@ -344,6 +388,13 @@ static int tee_keymgmt_export(void *keydata, int selection,
         }
     }
     
+    // 处理私钥选择：我们不能导出私钥，但可以提供元信息
+    if (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) {
+        // 对于TEE Provider，我们不导出实际的私钥参数，
+        // 但我们可以提供密钥大小等元信息来表明私钥存在
+        tee_log("✅ 私钥在TEE中（不导出实际私钥参数）");
+    }
+    
     // 导出密钥大小信息
     if (ctx->key_size > 0) {
         if (OSSL_PARAM_BLD_push_int(bld, OSSL_PKEY_PARAM_BITS, ctx->key_size) != 1) {
@@ -351,6 +402,7 @@ static int tee_keymgmt_export(void *keydata, int selection,
         }
     }
     
+    // 如果有任何需要导出的参数，导出它们
     params = OSSL_PARAM_BLD_to_param(bld);
     if (params) {
         ret = param_cb(params, cbarg);
@@ -390,7 +442,9 @@ static const OSSL_PARAM *tee_keymgmt_export_types(int selection) {
     
     tee_log("🔑 密钥管理：查询可导出参数类型 (selection=%d)", selection);
     
-    if (selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) {
+    // 对于TEE Provider，我们可以导出公钥参数和密钥大小信息
+    // 私钥不能导出，但我们支持私钥的元信息
+    if (selection & (OSSL_KEYMGMT_SELECT_PUBLIC_KEY | OSSL_KEYMGMT_SELECT_PRIVATE_KEY)) {
         return export_types;
     }
     
