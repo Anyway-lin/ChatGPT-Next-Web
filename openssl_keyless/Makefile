@@ -1,162 +1,259 @@
-# OpenSSL Keyless Mechanism Makefile
+# OpenSSL Keyless Implementation Makefile
 
 CC = gcc
-CFLAGS = -Wall -Wextra -std=c99 -g -O2 -fPIC
-LDFLAGS = -lssl -lcrypto -lpthread
+CFLAGS = -Wall -Wextra -O2 -g -std=c99 -D_GNU_SOURCE
+INCLUDES = -I.
+LIBS = -lssl -lcrypto -lpthread
 
-# 源文件
-SOURCES = tee_sign.c keyless_ssl.c test_keyless.c
-OBJECTS = $(SOURCES:.c=.o)
-HEADERS = tee_sign.h keyless_ssl.h
+# Source files
+TEE_SOURCES = tee_sign.c
+KEYLESS_SOURCES = keyless_ssl.c
+ENGINE_SOURCES = keyless_engine.c
+DEMO_SOURCES = demo.c
+SIMPLE_TLS_SOURCES = simple_tls_demo.c
+REAL_KEYLESS_TLS_SOURCES = real_keyless_tls.c
+SUCCESSFUL_KEYLESS_TLS_SOURCES = successful_keyless_tls.c
+TEST_SOURCES = test_keyless.c
+DEBUG_SOURCES = debug_test.c
 
-# 主要目标
-TARGET = test_keyless
-DEMO = demo
-TLS_DEMO = tls_handshake_demo
-SIMPLE_TLS = simple_tls_demo
+# Object files
+TEE_OBJECTS = $(TEE_SOURCES:.c=.o)
+KEYLESS_OBJECTS = $(KEYLESS_SOURCES:.c=.o)
+ENGINE_OBJECTS = $(ENGINE_SOURCES:.c=.o)
+DEMO_OBJECTS = $(DEMO_SOURCES:.c=.o)
+SIMPLE_TLS_OBJECTS = $(SIMPLE_TLS_SOURCES:.c=.o)
+REAL_KEYLESS_TLS_OBJECTS = $(REAL_KEYLESS_TLS_SOURCES:.c=.o)
+SUCCESSFUL_KEYLESS_TLS_OBJECTS = $(SUCCESSFUL_KEYLESS_TLS_SOURCES:.c=.o)
+TEST_OBJECTS = $(TEST_SOURCES:.c=.o)
+DEBUG_OBJECTS = $(DEBUG_SOURCES:.c=.o)
+
+# Library
 LIBRARY = libkeyless.so
 
-# 默认目标
-all: $(TARGET) $(DEMO) $(TLS_DEMO) $(SIMPLE_TLS) $(LIBRARY)
+# Executables
+DEMO_EXEC = demo
+SIMPLE_TLS_EXEC = simple_tls_demo
+REAL_KEYLESS_TLS_EXEC = real_keyless_tls
+SUCCESSFUL_KEYLESS_TLS_EXEC = successful_keyless_tls
+TEST_EXEC = test_keyless
+DEBUG_EXEC = debug_test
 
-# 编译测试程序
-$(TARGET): $(OBJECTS)
-	@echo "Linking test program..."
-	$(CC) -o $@ $^ $(LDFLAGS)
-	@echo "Test program built successfully: $(TARGET)"
+# Default target
+all: check-deps $(LIBRARY) $(DEMO_EXEC) $(SIMPLE_TLS_EXEC) $(REAL_KEYLESS_TLS_EXEC) $(SUCCESSFUL_KEYLESS_TLS_EXEC) $(TEST_EXEC) $(DEBUG_EXEC)
 
-# 编译演示程序
-$(DEMO): demo.o tee_sign.o keyless_ssl.o
-	@echo "Linking demo program..."
-	$(CC) -o $@ $^ $(LDFLAGS)
-	@echo "Demo program built successfully: $(DEMO)"
+# Check dependencies
+check-deps:
+	@echo "Checking dependencies..."
+	@which gcc > /dev/null || (echo "❌ GCC not found. Please install gcc." && exit 1)
+	@pkg-config --exists openssl || (echo "❌ OpenSSL development libraries not found. Please install libssl-dev." && exit 1)
+	@echo "✅ Dependencies check passed"
 
-# 编译TLS握手演示程序
-$(TLS_DEMO): tls_handshake_demo.o tee_sign.o keyless_ssl.o
-	@echo "Linking TLS handshake demo program..."
-	$(CC) -o $@ $^ $(LDFLAGS)
-	@echo "TLS demo program built successfully: $(TLS_DEMO)"
+# Library target
+$(LIBRARY): $(TEE_OBJECTS) $(KEYLESS_OBJECTS) $(ENGINE_OBJECTS)
+	@echo "Building shared library $(LIBRARY)..."
+	$(CC) -shared -fPIC $(CFLAGS) $(INCLUDES) -o $@ $^ $(LIBS)
+	@echo "✅ Library built successfully"
 
-# 编译简化TLS演示程序
-$(SIMPLE_TLS): simple_tls_demo.o tee_sign.o keyless_ssl.o
-	@echo "Linking simple TLS demo program..."
-	$(CC) -o $@ $^ $(LDFLAGS)
-	@echo "Simple TLS demo program built successfully: $(SIMPLE_TLS)"
+# Demo executable
+$(DEMO_EXEC): $(DEMO_OBJECTS) $(TEE_OBJECTS) $(KEYLESS_OBJECTS)
+	@echo "Building $(DEMO_EXEC)..."
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LIBS)
+	@echo "✅ Demo built successfully"
 
-# 编译共享库
-$(LIBRARY): tee_sign.o keyless_ssl.o
-	@echo "Building shared library..."
-	$(CC) -shared -o $@ $^ $(LDFLAGS)
-	@echo "Shared library built successfully: $(LIBRARY)"
+# Simple TLS demo executable  
+$(SIMPLE_TLS_EXEC): $(SIMPLE_TLS_OBJECTS) $(TEE_OBJECTS) $(KEYLESS_OBJECTS)
+	@echo "Building $(SIMPLE_TLS_EXEC)..."
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LIBS)
+	@echo "✅ Simple TLS demo built successfully"
 
-# 编译目标文件
-%.o: %.c $(HEADERS)
+# Real keyless TLS demo executable (with ENGINE)
+$(REAL_KEYLESS_TLS_EXEC): $(REAL_KEYLESS_TLS_OBJECTS) $(TEE_OBJECTS) $(ENGINE_OBJECTS)
+	@echo "Building $(REAL_KEYLESS_TLS_EXEC)..."
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LIBS)
+	@echo "✅ Real keyless TLS demo built successfully"
+
+# Successful keyless TLS demo executable
+$(SUCCESSFUL_KEYLESS_TLS_EXEC): $(SUCCESSFUL_KEYLESS_TLS_OBJECTS) $(TEE_OBJECTS)
+	@echo "Building $(SUCCESSFUL_KEYLESS_TLS_EXEC)..."
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LIBS)
+	@echo "✅ Successful keyless TLS demo built successfully"
+
+# Test executable
+$(TEST_EXEC): $(TEST_OBJECTS) $(TEE_OBJECTS) $(KEYLESS_OBJECTS) $(ENGINE_OBJECTS)
+	@echo "Building $(TEST_EXEC)..."
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LIBS)
+	@echo "✅ Test suite built successfully"
+
+# Debug executable
+$(DEBUG_EXEC): $(DEBUG_OBJECTS) $(TEE_OBJECTS) $(KEYLESS_OBJECTS) $(ENGINE_OBJECTS)
+	@echo "Building $(DEBUG_EXEC)..."
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $^ $(LIBS)
+	@echo "✅ Debug test built successfully"
+
+# Object file compilation
+%.o: %.c
 	@echo "Compiling $<..."
-	$(CC) $(CFLAGS) -c $< -o $@
+	$(CC) $(CFLAGS) $(INCLUDES) -fPIC -c $< -o $@
 
-# 运行测试
-test: $(TARGET)
-	@echo "Running keyless SSL tests..."
-	./$(TARGET)
+# Clean
+clean:
+	@echo "Cleaning up..."
+	rm -f *.o $(LIBRARY) $(DEMO_EXEC) $(SIMPLE_TLS_EXEC) $(REAL_KEYLESS_TLS_EXEC) $(TEST_EXEC) $(DEBUG_EXEC)
+	@echo "✅ Clean completed"
 
-# 运行测试（详细输出）
-test-verbose: $(TARGET)
-	@echo "Running keyless SSL tests with verbose output..."
-	LD_LIBRARY_PATH=. ./$(TARGET)
-
-# 运行演示程序
-run-demo: $(DEMO)
-	@echo "Running keyless SSL demo..."
-	./$(DEMO)
-
-# 运行TLS握手演示程序
-run-tls-demo: $(TLS_DEMO)
-	@echo "Running keyless TLS handshake demo..."
-	./$(TLS_DEMO)
-
-# 运行简化TLS演示程序
-run-simple-tls: $(SIMPLE_TLS)
-	@echo "Running simple keyless TLS demo..."
-	./$(SIMPLE_TLS)
-
-# 安装库文件
+# Install (for system-wide installation)
 install: $(LIBRARY)
-	@echo "Installing library and headers..."
+	@echo "Installing keyless library..."
 	sudo cp $(LIBRARY) /usr/local/lib/
-	sudo cp $(HEADERS) /usr/local/include/
+	sudo cp tee_sign.h keyless_ssl.h keyless_engine.h /usr/local/include/
 	sudo ldconfig
-	@echo "Installation completed"
+	@echo "✅ Installation completed"
 
-# 卸载库文件
+# Uninstall
 uninstall:
-	@echo "Uninstalling library and headers..."
+	@echo "Uninstalling keyless library..."
 	sudo rm -f /usr/local/lib/$(LIBRARY)
 	sudo rm -f /usr/local/include/tee_sign.h
 	sudo rm -f /usr/local/include/keyless_ssl.h
+	sudo rm -f /usr/local/include/keyless_engine.h
 	sudo ldconfig
-	@echo "Uninstallation completed"
+	@echo "✅ Uninstall completed"
 
-# 检查依赖
-check-deps:
-	@echo "Checking dependencies..."
-	@pkg-config --exists openssl && echo "✓ OpenSSL development libraries found" || echo "✗ OpenSSL development libraries not found"
-	@which gcc > /dev/null && echo "✓ GCC compiler found" || echo "✗ GCC compiler not found"
-	@echo "Dependencies check completed"
-
-# 清理编译文件
-clean:
-	@echo "Cleaning build files..."
-	rm -f $(OBJECTS) demo.o tls_handshake_demo.o simple_tls_demo.o $(TARGET) $(DEMO) $(TLS_DEMO) $(SIMPLE_TLS) $(LIBRARY)
-	rm -f *.so *.a
-	@echo "Clean completed"
-
-# 显示帮助信息
-help:
-	@echo "OpenSSL Keyless Mechanism Build System"
-	@echo "Available targets:"
-	@echo "  all             - Build all programs and shared library (default)"
-	@echo "  test            - Build and run tests"
-	@echo "  test-verbose    - Build and run tests with verbose output"
-	@echo "  run-demo        - Run basic keyless SSL demo"
-	@echo "  run-tls-demo    - Run complete TLS handshake demo"
-	@echo "  run-simple-tls  - Run simplified TLS handshake demo"
-	@echo "  install         - Install library to system"
-	@echo "  uninstall       - Remove library from system"
-	@echo "  check-deps      - Check build dependencies"
-	@echo "  clean           - Remove build files"
-	@echo "  help            - Show this help message"
+# Run basic demo
+run-demo: $(DEMO_EXEC)
 	@echo ""
-	@echo "Example usage:"
-	@echo "  make all            # Build everything"
-	@echo "  make run-tls-demo   # Run TLS handshake demo"
-	@echo "  make test           # Run tests"
-	@echo "  make clean          # Clean up"
+	@echo "🚀 Running basic keyless SSL demo..."
+	@echo "======================================"
+	./$(DEMO_EXEC)
 
-# 调试构建
-debug: CFLAGS += -DDEBUG -g3
-debug: $(TARGET)
-	@echo "Debug build completed"
+# Run simple TLS demo
+run-simple-tls: $(SIMPLE_TLS_EXEC)
+	@echo ""
+	@echo "🚀 Running simple TLS demo..."
+	@echo "=============================="
+	./$(SIMPLE_TLS_EXEC)
 
-# 发布构建
-release: CFLAGS += -O3 -DNDEBUG
-release: $(TARGET) $(LIBRARY)
-	@echo "Release build completed"
+# Run real keyless TLS demo (with ENGINE)
+run-real-keyless-tls: $(REAL_KEYLESS_TLS_EXEC)
+	@echo ""
+	@echo "🚀 Running REAL keyless TLS demo with ENGINE..."
+	@echo "=============================================="
+	@echo "This demo will perform a COMPLETE TLS handshake"
+	@echo "using ENGINE to intercept OpenSSL signing operations."
+	@echo ""
+	./$(REAL_KEYLESS_TLS_EXEC)
 
-# 代码分析
-analyze:
-	@echo "Running static analysis..."
-	@which cppcheck > /dev/null && cppcheck --enable=all --suppress=missingIncludeSystem $(SOURCES) || echo "cppcheck not found, skipping analysis"
+# Run successful keyless TLS demo
+run-successful-keyless-tls: $(SUCCESSFUL_KEYLESS_TLS_EXEC)
+	@echo ""
+	@echo "🚀 Running SUCCESSFUL keyless TLS demo..."
+	@echo "========================================"
+	@echo "This demo demonstrates the keyless concept with"
+	@echo "TEE integration and successful TLS handshake."
+	@echo ""
+	./$(SUCCESSFUL_KEYLESS_TLS_EXEC)
 
-# 内存检查
-valgrind: $(TARGET)
-	@echo "Running memory leak check..."
-	@which valgrind > /dev/null && valgrind --leak-check=full --track-origins=yes ./$(TARGET) || echo "valgrind not found, skipping memory check"
+# Run tests
+test: $(TEST_EXEC)
+	@echo ""
+	@echo "🧪 Running comprehensive test suite..."
+	@echo "====================================="
+	./$(TEST_EXEC)
 
-# 显示版本信息
-version:
-	@echo "OpenSSL Keyless Mechanism v1.0"
-	@echo "Built with:"
-	@$(CC) --version | head -1
-	@pkg-config --modversion openssl 2>/dev/null || echo "OpenSSL version unknown"
+# Run debug test
+debug: $(DEBUG_EXEC)
+	@echo ""
+	@echo "🔍 Running debug test..."
+	@echo "======================="
+	./$(DEBUG_EXEC)
 
-.PHONY: all test test-verbose install uninstall check-deps clean help debug release analyze valgrind version
+# Valgrind memory check
+valgrind-demo: $(DEMO_EXEC)
+	@echo "🔍 Running demo with Valgrind memory check..."
+	valgrind --leak-check=full --show-leak-kinds=all ./$(DEMO_EXEC)
+
+valgrind-test: $(TEST_EXEC)
+	@echo "🔍 Running tests with Valgrind memory check..."
+	valgrind --leak-check=full --show-leak-kinds=all ./$(TEST_EXEC)
+
+valgrind-real-keyless: $(REAL_KEYLESS_TLS_EXEC)
+	@echo "🔍 Running real keyless TLS with Valgrind memory check..."
+	valgrind --leak-check=full --show-leak-kinds=all ./$(REAL_KEYLESS_TLS_EXEC)
+
+# Static analysis
+static-analysis:
+	@echo "🔍 Running static analysis..."
+	cppcheck --enable=all --std=c99 *.c *.h
+
+# Performance benchmark
+benchmark: $(TEST_EXEC)
+	@echo "📊 Running performance benchmark..."
+	time ./$(TEST_EXEC)
+
+# Code coverage (requires gcov)
+coverage: CFLAGS += -fprofile-arcs -ftest-coverage
+coverage: LIBS += -lgcov
+coverage: clean all test
+	@echo "📈 Generating code coverage report..."
+	gcov *.c
+	@echo "Coverage files generated: *.gcov"
+
+# Format code
+format:
+	@echo "🎨 Formatting code..."
+	@which clang-format > /dev/null && clang-format -i *.c *.h || echo "clang-format not found, skipping formatting"
+
+# Help
+help:
+	@echo "🔐 OpenSSL Keyless Implementation Build System"
+	@echo "============================================="
+	@echo ""
+	@echo "Available targets:"
+	@echo "  all                    - Build all components"
+	@echo "  $(LIBRARY)             - Build shared library only"
+	@echo "  $(DEMO_EXEC)           - Build basic demo only"
+	@echo "  $(SIMPLE_TLS_EXEC)     - Build simple TLS demo only"  
+	@echo "  $(REAL_KEYLESS_TLS_EXEC) - Build real keyless TLS demo (ENGINE)"
+	@echo "  $(TEST_EXEC)           - Build test suite only"
+	@echo "  $(DEBUG_EXEC)          - Build debug test only"
+	@echo ""
+	@echo "Run targets:"
+	@echo "  run-demo               - Run basic keyless SSL demo"
+	@echo "  run-simple-tls         - Run simple TLS demo"
+	@echo "  run-real-keyless-tls   - Run REAL keyless TLS demo (ENGINE) ⭐"
+	@echo "  test                   - Run comprehensive test suite"
+	@echo "  debug                  - Run debug test"
+	@echo ""
+	@echo "Analysis targets:"
+	@echo "  valgrind-demo          - Run demo with memory check"
+	@echo "  valgrind-test          - Run tests with memory check"
+	@echo "  valgrind-real-keyless  - Run real keyless TLS with memory check"
+	@echo "  static-analysis        - Run static code analysis"
+	@echo "  benchmark              - Run performance benchmark"
+	@echo "  coverage               - Generate code coverage report"
+	@echo ""
+	@echo "Utility targets:"
+	@echo "  install                - Install library system-wide"
+	@echo "  uninstall              - Remove installed library"
+	@echo "  format                 - Format code with clang-format"
+	@echo "  clean                  - Clean build artifacts"
+	@echo "  check-deps             - Check build dependencies"
+	@echo "  help                   - Show this help message"
+	@echo ""
+	@echo "🎯 RECOMMENDED: 'make run-real-keyless-tls' for complete TLS demo!"
+	@echo ""
+
+# Phony targets
+.PHONY: all clean install uninstall run-demo run-simple-tls run-real-keyless-tls test debug \
+        valgrind-demo valgrind-test valgrind-real-keyless static-analysis benchmark \
+        coverage format help check-deps
+
+# Dependencies
+$(TEE_OBJECTS): tee_sign.h
+$(KEYLESS_OBJECTS): keyless_ssl.h tee_sign.h
+$(ENGINE_OBJECTS): keyless_engine.h tee_sign.h
+$(DEMO_OBJECTS): tee_sign.h keyless_ssl.h
+$(SIMPLE_TLS_OBJECTS): tee_sign.h keyless_ssl.h
+$(REAL_KEYLESS_TLS_OBJECTS): keyless_engine.h tee_sign.h
+$(TEST_OBJECTS): tee_sign.h keyless_ssl.h keyless_engine.h
+$(DEBUG_OBJECTS): tee_sign.h keyless_ssl.h keyless_engine.h
