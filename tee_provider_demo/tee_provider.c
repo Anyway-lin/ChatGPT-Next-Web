@@ -35,8 +35,78 @@ TEE_KEY *tee_key_new(void) {
     memset(key, 0, sizeof(TEE_KEY));
     key->ref_count = 1;
     key->key_id = strdup("tee-default-key");
+    key->tee_handle = -1; // 初始化TEE句柄为无效值
     
     tee_log_debug("Created new TEE key: %p", key);
+    return key;
+}
+
+/* 通过密钥ID从TEE环境加载密钥 */
+TEE_KEY *tee_key_load_by_id(TEE_PROVIDER_CTX *provctx, const char *key_id) {
+    tee_log_debug("Loading TEE key by ID: %s", key_id);
+    
+    /* 在真实的TEE实现中，这里会调用TEE APIs来获取密钥句柄 */
+    /* 例如: TEEC_InvokeCommand() 来请求TEE内部的密钥 */
+    
+    TEE_KEY *key = tee_key_new();
+    if (!key) {
+        tee_log_error("Failed to allocate TEE key structure");
+        return NULL;
+    }
+    
+    /* 设置密钥ID */
+    if (key->key_id) free(key->key_id);
+    key->key_id = strdup(key_id);
+    
+    /* 模拟TEE密钥句柄分配 */
+    key->tee_handle = 0x1000 + (int)(strlen(key_id) % 1000);
+    key->key_type = EVP_PKEY_RSA;
+    key->key_size = 2048;
+    
+    /* 在演示中，我们从文件加载私钥内容到TEE环境 */
+    /* 注意：在真实TEE中，这些密钥材料永远不会暴露给客户端 */
+    FILE *fp = fopen("certs/device_key.pem", "r");
+    if (fp) {
+        key->pkey = PEM_read_PrivateKey(fp, NULL, NULL, NULL);
+        fclose(fp);
+        
+        if (key->pkey) {
+            tee_log_debug("Successfully loaded private key into TEE environment");
+            tee_log_debug("TEE Handle: 0x%x", key->tee_handle);
+            tee_log_debug("注意：真实TEE中密钥材料永远不会离开安全环境");
+        } else {
+            tee_log_error("Failed to load private key content");
+        }
+    } else {
+        tee_log_error("Failed to access key file for TEE loading");
+    }
+    
+    return key;
+}
+
+/* 将密钥存储到TEE环境中 */
+int tee_key_store(TEE_PROVIDER_CTX *provctx, TEE_KEY *key, const char *key_id) {
+    if (!key || !key_id) return 0;
+    
+    tee_log_debug("Storing key in TEE environment with ID: %s", key_id);
+    
+    /* 在真实的TEE实现中，这里会调用TEE APIs来存储密钥 */
+    /* 例如: TEEC_InvokeCommand() 来将密钥安全存储在TEE中 */
+    
+    if (key->key_id) free(key->key_id);
+    key->key_id = strdup(key_id);
+    
+    /* 模拟分配TEE句柄 */
+    key->tee_handle = 0x2000 + (int)(strlen(key_id) % 1000);
+    
+    tee_log_debug("Key stored in TEE with handle: 0x%x", key->tee_handle);
+    return 1;
+}
+
+/* 增加密钥引用 */
+TEE_KEY *tee_key_reference(TEE_KEY *key) {
+    if (!key) return NULL;
+    tee_key_up_ref(key);
     return key;
 }
 

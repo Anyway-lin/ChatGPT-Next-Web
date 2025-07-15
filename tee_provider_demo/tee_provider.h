@@ -27,6 +27,9 @@
 #define TEE_PROVIDER_NAME           "tee-provider"
 #define TEE_PROVIDER_VERSION        "1.0.0"
 
+/* 前向声明 */
+typedef struct tee_provider_ctx_st TEE_PROVIDER_CTX;
+
 /* TEE密钥结构 */
 typedef struct tee_key_st {
     int key_type;               /* 密钥类型 (EVP_PKEY_RSA等) */
@@ -34,14 +37,24 @@ typedef struct tee_key_st {
     EVP_PKEY *pkey;            /* OpenSSL私钥对象 */
     char *key_id;              /* 密钥标识符 */
     int ref_count;             /* 引用计数 */
+    int tee_handle;            /* TEE内部密钥句柄 */
+    unsigned char *key_material; /* 临时：演示用途，实际中不存储 */
+    size_t key_material_len;   /* 密钥材料长度 */
 } TEE_KEY;
 
 /* TEE Provider上下文 */
-typedef struct tee_provider_ctx_st {
+struct tee_provider_ctx_st {
     const OSSL_CORE_HANDLE *handle;
     OSSL_LIB_CTX *libctx;
     char *provname;
-} TEE_PROVIDER_CTX;
+};
+
+/* TEE密钥管理函数 */
+TEE_KEY *tee_key_new(void);
+void tee_key_free(TEE_KEY *key);
+TEE_KEY *tee_key_reference(TEE_KEY *key);
+TEE_KEY *tee_key_load_by_id(TEE_PROVIDER_CTX *provctx, const char *key_id);
+int tee_key_store(TEE_PROVIDER_CTX *provctx, TEE_KEY *key, const char *key_id);
 
 /* TEE签名上下文 */
 typedef struct tee_signature_ctx_st {
