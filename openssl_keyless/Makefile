@@ -123,13 +123,8 @@ stop-server:
 
 # 运行客户端
 run-client: $(SIMPLE_CLIENT)
-	@echo ""
-	@echo "🔗 Starting Simple TLS Client..."
-	@echo "==============================="
-	@echo "🔗 This client connects to the keyless TLS server"
-	@echo "💬 Interactive mode allows testing various commands"
-	@echo ""
-	./$(SIMPLE_CLIENT)
+	@chmod +x run_client.sh
+	@./run_client.sh
 
 # 运行演示
 run-demo: $(KEYLESS_DEMO)
