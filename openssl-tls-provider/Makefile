@@ -17,20 +17,24 @@ CERTS_DIR = certs
 
 # 源文件
 PROVIDER_SRC = $(SRC_DIR)/tee_provider.c
+PROVIDER_V2_SRC = $(SRC_DIR)/tee_provider_v2.c
 CLIENT_SRC = $(SRC_DIR)/tls_client.c
+CLIENT_V2_SRC = $(SRC_DIR)/tls_client_v2.c
 SERVER_SRC = $(SRC_DIR)/tls_server.c
 TEST_SRC = $(SRC_DIR)/test_tee_signature.c
 TEST_ADV_SRC = $(SRC_DIR)/test_tee_signature_advanced.c
 
 # 目标文件
 PROVIDER_LIB = $(BUILD_DIR)/libtee_provider.so
+PROVIDER_V2_LIB = $(BUILD_DIR)/libtee_provider_v2.so
 CLIENT_BIN = $(BUILD_DIR)/tls_client
+CLIENT_V2_BIN = $(BUILD_DIR)/tls_client_v2
 SERVER_BIN = $(BUILD_DIR)/tls_server
 TEST_BIN = $(BUILD_DIR)/test_tee_signature
 TEST_ADV_BIN = $(BUILD_DIR)/test_tee_signature_advanced
 
 # 默认目标
-all: $(PROVIDER_LIB) $(CLIENT_BIN) $(SERVER_BIN)
+all: $(PROVIDER_LIB) $(PROVIDER_V2_LIB) $(CLIENT_BIN) $(CLIENT_V2_BIN) $(SERVER_BIN)
 
 # 测试目标（包含签名测试）
 test-all: $(PROVIDER_LIB) $(CLIENT_BIN) $(SERVER_BIN) $(TEST_BIN) $(TEST_ADV_BIN)
@@ -50,11 +54,23 @@ $(PROVIDER_LIB): $(PROVIDER_SRC) | $(BUILD_DIR)
 	$(CC) $(CFLAGS) $(INCLUDES) -shared -o $@ $< $(LDFLAGS) $(LIBS)
 	@echo "TEE Provider编译完成: $@"
 
+# 编译TEE Provider V2共享库
+$(PROVIDER_V2_LIB): $(PROVIDER_V2_SRC) | $(BUILD_DIR)
+	@echo "编译TEE Provider V2共享库..."
+	$(CC) $(CFLAGS) $(INCLUDES) -shared -o $@ $< $(LDFLAGS) $(LIBS)
+	@echo "TEE Provider V2编译完成: $@"
+
 # 编译TLS客户端
 $(CLIENT_BIN): $(CLIENT_SRC) $(PROVIDER_SRC) | $(BUILD_DIR)
 	@echo "编译TLS客户端..."
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(CLIENT_SRC) $(PROVIDER_SRC) $(LDFLAGS) $(LIBS)
 	@echo "TLS客户端编译完成: $@"
+
+# 编译TLS客户端V2
+$(CLIENT_V2_BIN): $(CLIENT_V2_SRC) $(PROVIDER_V2_SRC) | $(BUILD_DIR)
+	@echo "编译TLS客户端V2..."
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(CLIENT_V2_SRC) $(PROVIDER_V2_SRC) $(LDFLAGS) $(LIBS)
+	@echo "TLS客户端V2编译完成: $@"
 
 # 编译TLS服务器
 $(SERVER_BIN): $(SERVER_SRC) | $(BUILD_DIR)
