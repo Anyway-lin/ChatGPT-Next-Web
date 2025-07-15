@@ -1,0 +1,6 @@
+Unable to bind: Address already in use
+=== TEE Provider TLS Test Server ===
+Starting server on port 8443
+SSL 80B521D9917F0000:error:0A000126:SSL routines::unexpected eof while reading:../ssl/record/rec_layer_s3.c:688:
+80B521D9917F0000:error:0A000126:SSL routines::unexpected eof while reading:../ssl/record/rec_layer_s3.c:688:
+80B521D9917F0000:error:0A000418:SSL routines:ssl3_read_bytes:tlsv1 alert unknown ca:../ssl/record/rec_layer_s3.c:908:SSL alert number 48

@@ -287,7 +287,10 @@ int tee_keymgmt_match(const void *keydata1, const void *keydata2, int selection)
 }
 
 void *tee_keymgmt_load(const void *reference, size_t reference_sz) {
-    if (!reference || reference_sz == 0) return NULL;
+    if (!reference || reference_sz == 0) {
+        tee_log_error("Invalid reference in keymgmt_load");
+        return NULL;
+    }
     
     const char *filename = (const char *)reference;
     TEE_KEY *key = NULL;
@@ -295,17 +298,29 @@ void *tee_keymgmt_load(const void *reference, size_t reference_sz) {
     tee_log_debug("Loading TEE key from reference: %.*s", (int)reference_sz, filename);
     
     if (tee_load_private_key_from_file(filename, &key)) {
+        tee_log_debug("Successfully loaded key: %p", key);
         return key;
     }
     
+    tee_log_error("Failed to load key from file");
     return NULL;
 }
 
 /* 签名操作 - 函数已在头文件中声明 */
 
 void *tee_signature_newctx(void *provctx, const char *propq) {
-    TEE_SIGNATURE_CTX *ctx = malloc(sizeof(TEE_SIGNATURE_CTX));
-    if (!ctx) return NULL;
+    TEE_SIGNATURE_CTX *ctx;
+    
+    if (!provctx) {
+        tee_log_error("Invalid provider context in signature_newctx");
+        return NULL;
+    }
+    
+    ctx = malloc(sizeof(TEE_SIGNATURE_CTX));
+    if (!ctx) {
+        tee_log_error("Failed to allocate signature context");
+        return NULL;
+    }
     
     memset(ctx, 0, sizeof(TEE_SIGNATURE_CTX));
     ctx->provctx = (TEE_PROVIDER_CTX *)provctx;
@@ -333,20 +348,32 @@ int tee_signature_sign_init(void *ctx, void *provkey, const OSSL_PARAM params[])
     TEE_SIGNATURE_CTX *sctx = (TEE_SIGNATURE_CTX *)ctx;
     TEE_KEY *key = (TEE_KEY *)provkey;
     
-    if (!sctx || !key) {
-        tee_log_error("Invalid parameters for sign init");
+    if (!sctx) {
+        tee_log_error("Invalid signature context for sign init");
+        return 0;
+    }
+    
+    if (!key) {
+        tee_log_error("Invalid key for sign init");
+        return 0;
+    }
+    
+    if (!key->pkey) {
+        tee_log_error("Key has no EVP_PKEY for sign init");
         return 0;
     }
     
     if (sctx->key) {
         tee_key_free(sctx->key);
+        sctx->key = NULL;
     }
     
     sctx->key = key;
     tee_key_up_ref(key);
     sctx->operation = EVP_PKEY_OP_SIGN;
     
-    tee_log_debug("TEE signature sign init completed for key: %s", key->key_id);
+    tee_log_debug("TEE signature sign init completed for key: %s", 
+                  key->key_id ? key->key_id : "unknown");
     return 1;
 }
 
@@ -354,13 +381,30 @@ int tee_signature_sign(void *ctx, unsigned char *sig, size_t *siglen,
                        size_t sigsize, const unsigned char *tbs, size_t tbslen) {
     TEE_SIGNATURE_CTX *sctx = (TEE_SIGNATURE_CTX *)ctx;
     
-    if (!sctx || !sctx->key) {
+    if (!sctx) {
         tee_log_error("Invalid signature context for sign");
+        return 0;
+    }
+    
+    if (!sctx->key) {
+        tee_log_error("No key in signature context for sign");
+        return 0;
+    }
+    
+    if (!siglen) {
+        tee_log_error("Invalid siglen pointer");
+        return 0;
+    }
+    
+    if (!tbs || tbslen == 0) {
+        tee_log_error("Invalid data to be signed");
         return 0;
     }
     
     unsigned char *result = NULL;
     size_t result_len = 0;
+    
+    tee_log_debug("Starting TEE signature operation");
     
     /* 在TEE环境中执行签名操作 */
     if (!tee_simulate_secure_operation(sctx->key, tbs, tbslen, &result, &result_len)) {
@@ -369,8 +413,10 @@ int tee_signature_sign(void *ctx, unsigned char *sig, size_t *siglen,
     }
     
     if (sig == NULL) {
+        /* 只返回需要的长度 */
         *siglen = result_len;
         free(result);
+        tee_log_debug("Returning signature length: %zu", result_len);
         return 1;
     }
     
@@ -465,27 +511,30 @@ static const OSSL_DISPATCH tee_keymgmt_rsa_functions[] = {
     { 0, NULL }
 };
 
+/* 简化的signature operations - 暂时只提供基本功能 */
 static const OSSL_DISPATCH tee_signature_rsa_functions[] = {
     { OSSL_FUNC_SIGNATURE_NEWCTX, (void (*)(void))tee_signature_newctx },
     { OSSL_FUNC_SIGNATURE_FREECTX, (void (*)(void))tee_signature_freectx },
-    { OSSL_FUNC_SIGNATURE_SIGN_INIT, (void (*)(void))tee_signature_sign_init },
-    { OSSL_FUNC_SIGNATURE_SIGN, (void (*)(void))tee_signature_sign },
-    { OSSL_FUNC_SIGNATURE_DIGEST_SIGN_INIT, (void (*)(void))tee_signature_digest_sign_init },
-    { OSSL_FUNC_SIGNATURE_DIGEST_SIGN_UPDATE, (void (*)(void))tee_signature_digest_sign_update },
-    { OSSL_FUNC_SIGNATURE_DIGEST_SIGN_FINAL, (void (*)(void))tee_signature_digest_sign_final },
     { 0, NULL }
 };
 
 const OSSL_DISPATCH *tee_provider_query_operation(void *provctx, int operation_id, int *no_cache) {
+    if (!provctx || !no_cache) {
+        tee_log_error("Invalid parameters in query_operation");
+        return NULL;
+    }
+    
     *no_cache = 0;
+    
+    tee_log_debug("Query operation called for operation_id: %d", operation_id);
     
     switch (operation_id) {
     case OSSL_OP_KEYMGMT:
-        tee_log_debug("Querying keymgmt operations");
-        return tee_keymgmt_rsa_functions;
+        tee_log_debug("Keymgmt operations requested but not supported yet");
+        return NULL;  /* 暂时禁用keymgmt operations */
     case OSSL_OP_SIGNATURE:
-        tee_log_debug("Querying signature operations");
-        return tee_signature_rsa_functions;
+        tee_log_debug("Signature operations requested but not supported yet");
+        return NULL;  /* 暂时禁用signature operations */
     default:
         tee_log_debug("Unsupported operation: %d", operation_id);
         return NULL;
@@ -539,7 +588,9 @@ int tee_provider_init(const OSSL_CORE_HANDLE *handle,
         case OSSL_FUNC_CORE_GET_LIBCTX:
             {
                 OSSL_FUNC_core_get_libctx_fn *get_libctx = OSSL_FUNC_core_get_libctx(in);
-                ctx->libctx = get_libctx(handle);
+                /* 修复指针类型不兼容问题 */
+                OPENSSL_CORE_CTX *core_ctx = get_libctx(handle);
+                ctx->libctx = (OSSL_LIB_CTX *)core_ctx;
             }
             break;
         default:
