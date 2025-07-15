@@ -117,12 +117,14 @@ SSL_CTX *create_ssl_context(OSSL_LIB_CTX *libctx) {
     
     log_message("INFO", "创建SSL上下文");
     
-    // 创建SSL上下文
-    ctx = SSL_CTX_new_ex(libctx, NULL, TLS_client_method());
+    // 创建SSL上下文 (强制使用TLS 1.2以触发客户端证书签名)
+    ctx = SSL_CTX_new_ex(libctx, NULL, TLSv1_2_client_method());
     if (!ctx) {
         handle_openssl_error("无法创建SSL上下文");
         return NULL;
     }
+    
+    log_message("INFO", "强制使用TLS 1.2以触发客户端证书签名操作");
     
     // 设置验证模式
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
@@ -141,7 +143,10 @@ SSL_CTX *create_ssl_context(OSSL_LIB_CTX *libctx) {
         return NULL;
     }
     
-    // 加载客户端私钥（TEE Provider将处理私钥操作）
+    // TEE模式：加载私钥文件但通过TEE Provider处理私钥操作
+    log_message("INFO", "TEE模式：加载私钥以建立证书-私钥关联，但私钥操作由TEE Provider处理");
+    
+    // 加载私钥文件建立关联（TEE Provider将接管实际的私钥操作）
     if (SSL_CTX_use_PrivateKey_file(ctx, DEFAULT_CLIENT_KEY, SSL_FILETYPE_PEM) <= 0) {
         handle_openssl_error("无法加载客户端私钥");
         SSL_CTX_free(ctx);
@@ -155,8 +160,7 @@ SSL_CTX *create_ssl_context(OSSL_LIB_CTX *libctx) {
         return NULL;
     }
     
-    // 设置使用TEE Provider进行私钥操作
-    log_message("INFO", "配置使用TEE Provider进行私钥操作");
+    log_message("INFO", "TEE模式：私钥操作将由TEE Provider完成");
     
     return ctx;
 }

@@ -19,14 +19,19 @@ CERTS_DIR = certs
 PROVIDER_SRC = $(SRC_DIR)/tee_provider.c
 CLIENT_SRC = $(SRC_DIR)/tls_client.c
 SERVER_SRC = $(SRC_DIR)/tls_server.c
+TEST_SRC = $(SRC_DIR)/test_tee_signature.c
 
 # 目标文件
 PROVIDER_LIB = $(BUILD_DIR)/libtee_provider.so
 CLIENT_BIN = $(BUILD_DIR)/tls_client
 SERVER_BIN = $(BUILD_DIR)/tls_server
+TEST_BIN = $(BUILD_DIR)/test_tee_signature
 
 # 默认目标
 all: $(PROVIDER_LIB) $(CLIENT_BIN) $(SERVER_BIN)
+
+# 测试目标（包含签名测试）
+test-all: $(PROVIDER_LIB) $(CLIENT_BIN) $(SERVER_BIN) $(TEST_BIN)
 
 # 创建构建目录
 $(BUILD_DIR):
@@ -49,6 +54,12 @@ $(SERVER_BIN): $(SERVER_SRC) | $(BUILD_DIR)
 	@echo "编译TLS服务器..."
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $< $(LDFLAGS) $(LIBS)
 	@echo "TLS服务器编译完成: $@"
+
+# 编译TEE签名测试程序
+$(TEST_BIN): $(TEST_SRC) $(PROVIDER_SRC) | $(BUILD_DIR)
+	@echo "编译TEE签名测试程序..."
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(TEST_SRC) $(PROVIDER_SRC) $(LDFLAGS) $(LIBS)
+	@echo "TEE签名测试程序编译完成: $@"
 
 # 生成证书
 certs: $(SCRIPTS_DIR)/generate_certs.sh

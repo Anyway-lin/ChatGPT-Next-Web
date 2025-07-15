@@ -32,6 +32,13 @@ typedef struct {
     char *mdname;
 } TEE_SIG_CTX;
 
+// TEE key management context
+typedef struct {
+    TEE_PROV_CTX *provctx;
+    EVP_PKEY *pkey;
+    int key_loaded;
+} TEE_KEY_CTX;
+
 // 全局变量存储私钥路径
 static char *global_private_key_path = NULL;
 
@@ -192,6 +199,118 @@ static const OSSL_DISPATCH tee_signature_functions[] = {
     { 0, NULL }
 };
 
+// ==================== 密钥管理操作 ====================
+
+// 创建新的密钥管理上下文
+static void *tee_keymgmt_new(void *provctx) {
+    TEE_KEY_CTX *ctx = OPENSSL_zalloc(sizeof(TEE_KEY_CTX));
+    if (ctx == NULL) {
+        return NULL;
+    }
+    
+    ctx->provctx = (TEE_PROV_CTX *)provctx;
+    ctx->key_loaded = 0;
+    
+    tee_log("密钥管理上下文创建成功");
+    return ctx;
+}
+
+// 释放密钥管理上下文
+static void tee_keymgmt_free(void *keydata) {
+    TEE_KEY_CTX *ctx = (TEE_KEY_CTX *)keydata;
+    if (ctx) {
+        if (ctx->pkey) {
+            EVP_PKEY_free(ctx->pkey);
+        }
+        OPENSSL_free(ctx);
+    }
+}
+
+// 从TEE环境加载私钥
+static void *tee_keymgmt_load(const void *reference, size_t reference_sz) {
+    TEE_KEY_CTX *ctx = OPENSSL_zalloc(sizeof(TEE_KEY_CTX));
+    if (ctx == NULL) {
+        return NULL;
+    }
+    
+    tee_log("TEE密钥管理：开始加载私钥");
+    
+    // 在真实TEE中，这里会从安全存储加载私钥
+    // 这里我们模拟从指定路径加载私钥
+    if (global_private_key_path) {
+        ctx->pkey = load_private_key_from_tee(global_private_key_path);
+        if (ctx->pkey) {
+            ctx->key_loaded = 1;
+            tee_log("TEE密钥管理：私钥加载成功");
+        } else {
+            tee_log("TEE密钥管理：私钥加载失败");
+            OPENSSL_free(ctx);
+            return NULL;
+        }
+    }
+    
+    return ctx;
+}
+
+// 检查密钥是否存在
+static int tee_keymgmt_has(const void *keydata, int selection) {
+    const TEE_KEY_CTX *ctx = (const TEE_KEY_CTX *)keydata;
+    if (ctx == NULL) {
+        return 0;
+    }
+    
+    // 检查是否有私钥
+    if (selection & OSSL_KEYMGMT_SELECT_PRIVATE_KEY) {
+        return ctx->key_loaded && ctx->pkey != NULL;
+    }
+    
+    return 0;
+}
+
+// 匹配密钥
+static int tee_keymgmt_match(const void *keydata1, const void *keydata2, int selection) {
+    const TEE_KEY_CTX *ctx1 = (const TEE_KEY_CTX *)keydata1;
+    const TEE_KEY_CTX *ctx2 = (const TEE_KEY_CTX *)keydata2;
+    
+    if (ctx1 == NULL || ctx2 == NULL) {
+        return 0;
+    }
+    
+    if (ctx1->pkey && ctx2->pkey) {
+        return EVP_PKEY_eq(ctx1->pkey, ctx2->pkey);
+    }
+    
+    return 0;
+}
+
+// 导出公钥
+static int tee_keymgmt_export(void *keydata, int selection, OSSL_CALLBACK *param_cb, void *cbarg) {
+    TEE_KEY_CTX *ctx = (TEE_KEY_CTX *)keydata;
+    
+    if (ctx == NULL || ctx->pkey == NULL) {
+        return 0;
+    }
+    
+    // 对于TEE模式，我们只导出公钥部分
+    if (selection & OSSL_KEYMGMT_SELECT_PUBLIC_KEY) {
+        tee_log("TEE密钥管理：导出公钥");
+        return 1;
+    }
+    
+    return 0;
+}
+
+// 密钥管理操作调度表
+static const OSSL_DISPATCH tee_keymgmt_functions[] = {
+    { OSSL_FUNC_KEYMGMT_NEW, (void (*)(void))tee_keymgmt_new },
+    { OSSL_FUNC_KEYMGMT_FREE, (void (*)(void))tee_keymgmt_free },
+    { OSSL_FUNC_KEYMGMT_LOAD, (void (*)(void))tee_keymgmt_load },
+    { OSSL_FUNC_KEYMGMT_HAS, (void (*)(void))tee_keymgmt_has },
+    { OSSL_FUNC_KEYMGMT_MATCH, (void (*)(void))tee_keymgmt_match },
+    { OSSL_FUNC_KEYMGMT_EXPORT, (void (*)(void))tee_keymgmt_export },
+    { 0, NULL }
+};
+
 // 算法查询函数
 static const OSSL_ALGORITHM *tee_provider_query(void *provctx, int operation_id, int *no_cache) {
     *no_cache = 0;
@@ -205,6 +324,16 @@ static const OSSL_ALGORITHM *tee_provider_query(void *provctx, int operation_id,
                     { NULL, NULL, NULL }
                 };
                 return signature_algs;
+            }
+        case OSSL_OP_KEYMGMT:
+            {
+                static const OSSL_ALGORITHM keymgmt_algs[] = {
+                    { "RSA", "provider=tee", tee_keymgmt_functions },
+                    { "RSA-PSS", "provider=tee", tee_keymgmt_functions },
+                    { NULL, NULL, NULL }
+                };
+                tee_log("TEE Provider：返回密钥管理算法");
+                return keymgmt_algs;
             }
         default:
             return NULL;

@@ -54,12 +54,14 @@ SSL_CTX *create_ssl_context() {
     
     log_message("INFO", "创建SSL上下文");
     
-    // 创建SSL上下文
-    ctx = SSL_CTX_new(TLS_server_method());
+    // 创建SSL上下文 (支持TLS 1.2以触发客户端证书签名)
+    ctx = SSL_CTX_new(TLSv1_2_server_method());
     if (!ctx) {
         handle_openssl_error("无法创建SSL上下文");
         return NULL;
     }
+    
+    log_message("INFO", "使用TLS 1.2以支持客户端证书签名验证");
     
     // 设置验证模式
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, NULL);
