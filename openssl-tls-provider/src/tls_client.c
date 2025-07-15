@@ -15,7 +15,6 @@
 #include <openssl/evp.h>
 #include <openssl/params.h>
 #include <openssl/core_names.h>
-#include <dlfcn.h>
 
 #include "tee_provider.h"
 
@@ -29,7 +28,6 @@
 
 // 全局变量
 static OSSL_PROVIDER *tee_provider = NULL;
-static void *provider_handle = NULL;
 
 // 日志函数
 void log_message(const char *level, const char *message) {
@@ -48,42 +46,23 @@ void handle_openssl_error(const char *msg) {
     }
 }
 
-// 加载TEE Provider
+// 加载TEE Provider  
 int load_tee_provider(OSSL_LIB_CTX *libctx) {
     log_message("INFO", "开始加载TEE Provider");
     
-    // 动态加载provider库
-    provider_handle = dlopen(PROVIDER_LIB_PATH, RTLD_LAZY);
-    if (!provider_handle) {
-        printf("无法加载provider库: %s\n", dlerror());
-        return 0;
-    }
+    // 直接添加builtin provider（静态链接方式）
+    extern int OSSL_provider_init(const OSSL_CORE_HANDLE *, const OSSL_DISPATCH *, const OSSL_DISPATCH **, void **);
     
-    // 获取provider初始化函数
-    int (*provider_init)(const OSSL_CORE_HANDLE *, const OSSL_DISPATCH *, const OSSL_DISPATCH **, void **) = 
-        dlsym(provider_handle, "OSSL_provider_init");
-    if (!provider_init) {
-        printf("无法找到provider初始化函数: %s\n", dlerror());
-        dlclose(provider_handle);
+    if (OSSL_PROVIDER_add_builtin(libctx, "tee", OSSL_provider_init) == 0) {
+        handle_openssl_error("无法添加TEE Provider");
         return 0;
     }
     
     // 加载provider
     tee_provider = OSSL_PROVIDER_load(libctx, "tee");
     if (!tee_provider) {
-        // 如果加载失败，尝试添加provider路径
-        if (OSSL_PROVIDER_add_builtin(libctx, "tee", provider_init) == 0) {
-            handle_openssl_error("无法添加TEE Provider");
-            dlclose(provider_handle);
-            return 0;
-        }
-        
-        tee_provider = OSSL_PROVIDER_load(libctx, "tee");
-        if (!tee_provider) {
-            handle_openssl_error("无法加载TEE Provider");
-            dlclose(provider_handle);
-            return 0;
-        }
+        handle_openssl_error("无法加载TEE Provider");
+        return 0;
     }
     
     log_message("INFO", "TEE Provider加载成功");
@@ -95,10 +74,6 @@ void unload_tee_provider() {
     if (tee_provider) {
         OSSL_PROVIDER_unload(tee_provider);
         tee_provider = NULL;
-    }
-    if (provider_handle) {
-        dlclose(provider_handle);
-        provider_handle = NULL;
     }
 }
 
@@ -166,8 +141,21 @@ SSL_CTX *create_ssl_context(OSSL_LIB_CTX *libctx) {
         return NULL;
     }
     
+    // 加载客户端私钥（TEE Provider将处理私钥操作）
+    if (SSL_CTX_use_PrivateKey_file(ctx, DEFAULT_CLIENT_KEY, SSL_FILETYPE_PEM) <= 0) {
+        handle_openssl_error("无法加载客户端私钥");
+        SSL_CTX_free(ctx);
+        return NULL;
+    }
+    
+    // 验证私钥和证书匹配
+    if (SSL_CTX_check_private_key(ctx) <= 0) {
+        handle_openssl_error("私钥和证书不匹配");
+        SSL_CTX_free(ctx);
+        return NULL;
+    }
+    
     // 设置使用TEE Provider进行私钥操作
-    // 这里我们不直接加载私钥，而是让provider处理
     log_message("INFO", "配置使用TEE Provider进行私钥操作");
     
     return ctx;
@@ -329,6 +317,13 @@ int main(int argc, char *argv[]) {
     
     // 设置TEE Provider的私钥路径
     tee_provider_set_private_key_path(client_key);
+    
+    // 先加载默认provider（提供基本的加密算法）
+    if (!OSSL_PROVIDER_load(libctx, "default")) {
+        handle_openssl_error("无法加载默认Provider");
+        cleanup(ssl, ssl_ctx, sockfd, libctx);
+        return 1;
+    }
     
     // 加载TEE Provider
     if (!load_tee_provider(libctx)) {

@@ -8,7 +8,7 @@ set -e
 # 配置
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-OPENSSL_PREFIX="/opt/openssl-3.0.9/dist"
+OPENSSL_PREFIX="/usr"
 
 # 颜色输出
 RED='\033[0;31m'
@@ -36,11 +36,11 @@ log_error() {
 
 # 检查OpenSSL安装
 check_openssl() {
-    log_info "检查OpenSSL 3.0.9安装..."
+    log_info "检查OpenSSL安装..."
     
     if [ ! -d "$OPENSSL_PREFIX" ]; then
-        log_error "OpenSSL 3.0.9未安装在$OPENSSL_PREFIX"
-        log_info "请先安装OpenSSL 3.0.9到指定目录"
+        log_error "OpenSSL未安装在$OPENSSL_PREFIX"
+        log_info "请先安装OpenSSL开发包"
         exit 1
     fi
     
@@ -53,7 +53,7 @@ check_openssl() {
     log_success "OpenSSL版本: $version"
     
     # 检查必要的库文件
-    if [ ! -f "$OPENSSL_PREFIX/lib64/libssl.so" ] && [ ! -f "$OPENSSL_PREFIX/lib/libssl.so" ]; then
+    if [ ! -f "$OPENSSL_PREFIX/lib64/libssl.so" ] && [ ! -f "$OPENSSL_PREFIX/lib/libssl.so" ] && [ ! -f "$OPENSSL_PREFIX/lib/x86_64-linux-gnu/libssl.so.3" ]; then
         log_error "OpenSSL库文件不存在"
         exit 1
     fi
@@ -203,10 +203,10 @@ OpenSSL TLS Provider 构建脚本
     $0 test             # 仅测试
     $0 certs            # 仅生成证书
 
-注意事项:
-    - 确保OpenSSL 3.0.9已安装在 $OPENSSL_PREFIX
-    - 需要sudo权限进行安装/卸载操作
-    - 测试需要使用端口4433，确保该端口未被占用
+ 注意事项:
+     - 确保OpenSSL已安装在 $OPENSSL_PREFIX
+     - 需要sudo权限进行安装/卸载操作
+     - 测试需要使用端口4433，确保该端口未被占用
 EOF
 }
 

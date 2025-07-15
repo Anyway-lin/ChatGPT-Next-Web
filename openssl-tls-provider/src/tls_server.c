@@ -179,7 +179,8 @@ void handle_client(SSL *ssl, int client_fd) {
         printf("接收到客户端数据:\n%s\n", buffer);
         
         // 发送HTTP响应
-        const char *response = 
+        char response[2048];
+        snprintf(response, sizeof(response), 
             "HTTP/1.1 200 OK\r\n"
             "Content-Type: text/html\r\n"
             "Connection: close\r\n"
@@ -190,10 +191,11 @@ void handle_client(SSL *ssl, int client_fd) {
             "<body>\n"
             "<h1>TLS连接成功！</h1>\n"
             "<p>这是一个基于OpenSSL的TLS服务器响应。</p>\n"
-            "<p>使用的协议版本: " + *SSL_get_version(ssl) + "</p>\n"
-            "<p>使用的密码套件: " + *SSL_get_cipher(ssl) + "</p>\n"
+            "<p>使用的协议版本: %s</p>\n"
+            "<p>使用的密码套件: %s</p>\n"
             "</body>\n"
-            "</html>\n";
+            "</html>\n",
+            SSL_get_version(ssl), SSL_get_cipher(ssl));
         
         bytes_written = SSL_write(ssl, response, strlen(response));
         if (bytes_written <= 0) {

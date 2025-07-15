@@ -8,7 +8,7 @@ set -e
 # 配置
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
-OPENSSL_PREFIX="/opt/openssl-3.0.9/dist"
+OPENSSL_PREFIX="/usr"
 
 # 颜色输出
 RED='\033[0;31m'

@@ -2,10 +2,10 @@
 # 基于OpenSSL 3.0.9的TEE Provider模型
 
 # 配置
-OPENSSL_PREFIX = /opt/openssl-3.0.9/dist
+OPENSSL_PREFIX = /usr
 CC = gcc
 CFLAGS = -Wall -Wextra -g -O2 -fPIC
-LDFLAGS = -L$(OPENSSL_PREFIX)/lib64 -L$(OPENSSL_PREFIX)/lib
+LDFLAGS = -L$(OPENSSL_PREFIX)/lib/x86_64-linux-gnu -L$(OPENSSL_PREFIX)/lib64 -L$(OPENSSL_PREFIX)/lib
 LIBS = -lssl -lcrypto -ldl
 INCLUDES = -I$(OPENSSL_PREFIX)/include -Isrc
 
@@ -41,7 +41,7 @@ $(PROVIDER_LIB): $(PROVIDER_SRC) | $(BUILD_DIR)
 # 编译TLS客户端
 $(CLIENT_BIN): $(CLIENT_SRC) $(PROVIDER_SRC) | $(BUILD_DIR)
 	@echo "编译TLS客户端..."
-	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $< $(LDFLAGS) $(LIBS)
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(CLIENT_SRC) $(PROVIDER_SRC) $(LDFLAGS) $(LIBS)
 	@echo "TLS客户端编译完成: $@"
 
 # 编译TLS服务器
@@ -111,7 +111,7 @@ test: all certs
 check-env:
 	@echo "检查编译环境..."
 	@if [ ! -d "$(OPENSSL_PREFIX)" ]; then \
-		echo "错误: OpenSSL 3.0.9未安装在$(OPENSSL_PREFIX)"; \
+		echo "错误: OpenSSL未安装在$(OPENSSL_PREFIX)"; \
 		exit 1; \
 	fi
 	@echo "OpenSSL路径: $(OPENSSL_PREFIX)"

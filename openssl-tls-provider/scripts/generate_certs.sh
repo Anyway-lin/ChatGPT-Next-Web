@@ -3,7 +3,7 @@
 # 证书生成脚本
 # 基于OpenSSL 3.0.9生成测试证书
 
-OPENSSL_PATH="/opt/openssl-3.0.9/dist/bin/openssl"
+OPENSSL_PATH="/usr/bin/openssl"
 CERT_DIR="certs"
 DAYS=365
 
