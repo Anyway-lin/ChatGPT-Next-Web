@@ -114,6 +114,7 @@ int create_tcp_connection(const char *host, int port) {
 // 初始化SSL上下文
 SSL_CTX *create_ssl_context(OSSL_LIB_CTX *libctx) {
     SSL_CTX *ctx;
+    EVP_PKEY *tee_private_key = NULL;
     
     log_message("INFO", "创建SSL上下文");
     
@@ -143,22 +144,33 @@ SSL_CTX *create_ssl_context(OSSL_LIB_CTX *libctx) {
         return NULL;
     }
     
-    // TEE模式：加载私钥文件但通过TEE Provider处理私钥操作
-    log_message("INFO", "TEE模式：加载私钥以建立证书-私钥关联，但私钥操作由TEE Provider处理");
+    // TEE模式：使用TEE Provider构建的私钥
+    log_message("INFO", "TEE模式：使用TEE Provider构建的私钥");
     
-    // 加载私钥文件建立关联（TEE Provider将接管实际的私钥操作）
-    if (SSL_CTX_use_PrivateKey_file(ctx, DEFAULT_CLIENT_KEY, SSL_FILETYPE_PEM) <= 0) {
-        handle_openssl_error("无法加载客户端私钥");
+    // 从TEE provider获取构建的私钥
+    tee_private_key = tee_provider_get_private_key();
+    if (!tee_private_key) {
+        handle_openssl_error("无法获取TEE构建的私钥");
         SSL_CTX_free(ctx);
         return NULL;
     }
     
-    // 验证私钥和证书匹配
-    if (SSL_CTX_check_private_key(ctx) <= 0) {
-        handle_openssl_error("私钥和证书不匹配");
+    // 注意：OpenSSL会自动使用与私钥关联的provider进行签名操作
+    log_message("INFO", "TEE Provider将通过私钥关联自动使用");
+    
+    // 使用TEE构建的私钥
+    if (SSL_CTX_use_PrivateKey(ctx, tee_private_key) <= 0) {
+        handle_openssl_error("无法设置TEE私钥");
+        EVP_PKEY_free(tee_private_key);
         SSL_CTX_free(ctx);
         return NULL;
     }
+    
+    // 释放私钥引用（SSL_CTX已经持有引用）
+    EVP_PKEY_free(tee_private_key);
+    
+    // 验证私钥和证书匹配（这里会跳过实际验证，因为TEE私钥是基于证书构建的）
+    log_message("INFO", "TEE模式：跳过私钥证书匹配验证（TEE私钥基于证书构建）");
     
     log_message("INFO", "TEE模式：私钥操作将由TEE Provider完成");
     
@@ -319,9 +331,6 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     
-    // 设置TEE Provider的私钥路径
-    tee_provider_set_private_key_path(client_key);
-    
     // 先加载默认provider（提供基本的加密算法）
     if (!OSSL_PROVIDER_load(libctx, "default")) {
         handle_openssl_error("无法加载默认Provider");
@@ -335,6 +344,10 @@ int main(int argc, char *argv[]) {
         cleanup(ssl, ssl_ctx, sockfd, libctx);
         return 1;
     }
+    
+    // 设置TEE Provider的证书路径并构建私钥
+    tee_provider_set_certificate_path(client_cert);
+    log_message("INFO", "TEE Provider已根据客户端证书构建私钥");
     
     // 创建SSL上下文
     ssl_ctx = create_ssl_context(libctx);

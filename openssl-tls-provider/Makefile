@@ -20,18 +20,25 @@ PROVIDER_SRC = $(SRC_DIR)/tee_provider.c
 CLIENT_SRC = $(SRC_DIR)/tls_client.c
 SERVER_SRC = $(SRC_DIR)/tls_server.c
 TEST_SRC = $(SRC_DIR)/test_tee_signature.c
+TEST_ADV_SRC = $(SRC_DIR)/test_tee_signature_advanced.c
 
 # 目标文件
 PROVIDER_LIB = $(BUILD_DIR)/libtee_provider.so
 CLIENT_BIN = $(BUILD_DIR)/tls_client
 SERVER_BIN = $(BUILD_DIR)/tls_server
 TEST_BIN = $(BUILD_DIR)/test_tee_signature
+TEST_ADV_BIN = $(BUILD_DIR)/test_tee_signature_advanced
 
 # 默认目标
 all: $(PROVIDER_LIB) $(CLIENT_BIN) $(SERVER_BIN)
 
 # 测试目标（包含签名测试）
-test-all: $(PROVIDER_LIB) $(CLIENT_BIN) $(SERVER_BIN) $(TEST_BIN)
+test-all: $(PROVIDER_LIB) $(CLIENT_BIN) $(SERVER_BIN) $(TEST_BIN) $(TEST_ADV_BIN)
+
+# 高级测试
+test-advanced: $(TEST_ADV_BIN) certs
+	@echo "运行高级TEE签名测试..."
+	./$(TEST_ADV_BIN)
 
 # 创建构建目录
 $(BUILD_DIR):
@@ -60,6 +67,12 @@ $(TEST_BIN): $(TEST_SRC) $(PROVIDER_SRC) | $(BUILD_DIR)
 	@echo "编译TEE签名测试程序..."
 	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(TEST_SRC) $(PROVIDER_SRC) $(LDFLAGS) $(LIBS)
 	@echo "TEE签名测试程序编译完成: $@"
+
+# 编译高级TEE签名测试程序
+$(TEST_ADV_BIN): $(TEST_ADV_SRC) $(PROVIDER_SRC) | $(BUILD_DIR)
+	@echo "编译高级TEE签名测试程序..."
+	$(CC) $(CFLAGS) $(INCLUDES) -o $@ $(TEST_ADV_SRC) $(PROVIDER_SRC) $(LDFLAGS) $(LIBS)
+	@echo "高级TEE签名测试程序编译完成: $@"
 
 # 生成证书
 certs: $(SCRIPTS_DIR)/generate_certs.sh
