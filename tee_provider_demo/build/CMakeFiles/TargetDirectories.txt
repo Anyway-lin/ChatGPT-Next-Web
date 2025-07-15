@@ -1,0 +1,11 @@
+/workspace/tee_provider_demo/build/CMakeFiles/tee_provider.dir
+/workspace/tee_provider_demo/build/CMakeFiles/tls_client.dir
+/workspace/tee_provider_demo/build/CMakeFiles/test_server.dir
+/workspace/tee_provider_demo/build/CMakeFiles/generate_certs.dir
+/workspace/tee_provider_demo/build/CMakeFiles/test.dir
+/workspace/tee_provider_demo/build/CMakeFiles/edit_cache.dir
+/workspace/tee_provider_demo/build/CMakeFiles/rebuild_cache.dir
+/workspace/tee_provider_demo/build/CMakeFiles/list_install_components.dir
+/workspace/tee_provider_demo/build/CMakeFiles/install.dir
+/workspace/tee_provider_demo/build/CMakeFiles/install/local.dir
+/workspace/tee_provider_demo/build/CMakeFiles/install/strip.dir

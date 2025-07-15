@@ -1,0 +1,1 @@
+/usr/bin/cc  -Wall -Wextra -Wno-unused-parameter -g -O0 -DDEBUG -Xlinker --dependency-file=CMakeFiles/tls_client.dir/link.d CMakeFiles/tls_client.dir/tls_client.c.o -o tls_client  -Wl,-rpath,/workspace/tee_provider_demo/build: libtee_provider.so.1.0.0 /usr/lib/x86_64-linux-gnu/libssl.so /usr/lib/x86_64-linux-gnu/libcrypto.so

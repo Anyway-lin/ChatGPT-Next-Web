@@ -1,0 +1,1 @@
+/usr/bin/cc  -Wall -Wextra -Wno-unused-parameter -g -O0 -DDEBUG -Xlinker --dependency-file=CMakeFiles/test_server.dir/link.d CMakeFiles/test_server.dir/test_server.c.o -o test_server  /usr/lib/x86_64-linux-gnu/libssl.so /usr/lib/x86_64-linux-gnu/libcrypto.so

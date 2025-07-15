@@ -1,0 +1,1 @@
+/usr/bin/cc -fPIC  -Wall -Wextra -Wno-unused-parameter -g -O0 -DDEBUG -Xlinker --dependency-file=CMakeFiles/tee_provider.dir/link.d -shared -Wl,-soname,libtee_provider.so.1 -o libtee_provider.so.1.0.0 CMakeFiles/tee_provider.dir/tee_provider.c.o  /usr/lib/x86_64-linux-gnu/libssl.so /usr/lib/x86_64-linux-gnu/libcrypto.so
