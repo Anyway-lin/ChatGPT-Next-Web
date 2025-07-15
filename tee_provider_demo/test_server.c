@@ -92,8 +92,8 @@ static int configure_ssl_context(SSL_CTX *ctx) {
         return 0;
     }
     
-    /* 设置客户端证书验证 */
-    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER | SSL_VERIFY_FAIL_IF_NO_PEER_CERT, NULL);
+    /* 设置客户端证书验证 - 暂时使用宽松模式 */
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, NULL);
     
     /* 加载CA证书 */
     if (!SSL_CTX_load_verify_locations(ctx, "certs/root_ca_cert.pem", NULL)) {

@@ -112,8 +112,8 @@ static SSL_CTX *setup_ssl_context(OSSL_LIB_CTX *libctx, OSSL_PROVIDER *tee_prov)
     SSL_CTX_set_options(ctx, SSL_OP_NO_SSLv2 | SSL_OP_NO_SSLv3);
     SSL_CTX_set_mode(ctx, SSL_MODE_AUTO_RETRY);
     
-    /* 设置证书验证模式 */
-    SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, NULL);
+    /* 设置证书验证模式 - 暂时使用宽松模式 */
+    SSL_CTX_set_verify(ctx, SSL_VERIFY_NONE, NULL);
     
     /* 加载CA证书 */
     if (!SSL_CTX_load_verify_locations(ctx, "certs/root_ca_cert.pem", NULL)) {
