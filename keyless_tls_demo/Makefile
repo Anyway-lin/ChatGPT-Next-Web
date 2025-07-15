@@ -10,18 +10,21 @@ CERT_DIR = certs
 SCRIPT_DIR = scripts
 
 # 目标文件
-TARGETS = tls_server tls_client test_tee
+TARGETS = tls_server tls_client test_tee keyless_demo
 
 # 源文件
 TEE_MOCK_SRC = $(SRC_DIR)/tee_mock.c
 KEYLESS_PROVIDER_SRC = $(SRC_DIR)/keyless_provider.c
+KEYLESS_SSL_CALLBACK_SRC = $(SRC_DIR)/keyless_ssl_callback.c
 TLS_SERVER_SRC = $(SRC_DIR)/tls_server.c
 TLS_CLIENT_SRC = $(SRC_DIR)/tls_client.c
 TEST_TEE_SRC = $(SRC_DIR)/test_tee.c
+KEYLESS_DEMO_SRC = $(SRC_DIR)/keyless_demo.c
 
 # 头文件依赖
 TEE_MOCK_H = $(SRC_DIR)/tee_mock.h
 KEYLESS_PROVIDER_H = $(SRC_DIR)/keyless_provider.h
+KEYLESS_SSL_CALLBACK_H = $(SRC_DIR)/keyless_ssl_callback.h
 
 .PHONY: all clean certs test install-deps help
 
@@ -53,16 +56,24 @@ $(SRC_DIR)/tee_mock.o: $(TEE_MOCK_SRC) $(TEE_MOCK_H)
 $(SRC_DIR)/keyless_provider.o: $(KEYLESS_PROVIDER_SRC) $(KEYLESS_PROVIDER_H) $(TEE_MOCK_H)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+# 编译Keyless SSL Callback
+$(SRC_DIR)/keyless_ssl_callback.o: $(KEYLESS_SSL_CALLBACK_SRC) $(KEYLESS_SSL_CALLBACK_H) $(TEE_MOCK_H)
+	$(CC) $(CFLAGS) -c $< -o $@
+
 # 编译TLS服务器
 tls_server: $(TLS_SERVER_SRC)
 	$(CC) $(CFLAGS) $< -o $@ $(LDFLAGS)
 
-# 编译TLS客户端（使用keyless provider）
-tls_client: $(TLS_CLIENT_SRC) $(SRC_DIR)/tee_mock.o $(SRC_DIR)/keyless_provider.o
+# 编译TLS客户端（使用keyless SSL callback）
+tls_client: $(TLS_CLIENT_SRC) $(SRC_DIR)/tee_mock.o $(SRC_DIR)/keyless_ssl_callback.o
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 # 编译TEE测试程序
 test_tee: $(TEST_TEE_SRC) $(SRC_DIR)/tee_mock.o
+	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
+
+# 编译Keyless概念演示程序
+keyless_demo: $(KEYLESS_DEMO_SRC) $(SRC_DIR)/tee_mock.o
 	$(CC) $(CFLAGS) $^ -o $@ $(LDFLAGS)
 
 # 运行基本测试
@@ -84,13 +95,17 @@ test-tls: all
 # 运行交互式测试
 demo: all
 	@echo "=== Keyless TLS Demo ==="
-	@echo "1. Start the server in one terminal:"
+	@echo "1. Run the keyless concept demonstration:"
+	@echo "   ./keyless_demo"
+	@echo ""
+	@echo "2. Start the server in one terminal:"
 	@echo "   ./tls_server"
 	@echo ""
-	@echo "2. Run the client in another terminal:"
+	@echo "3. Run the client in another terminal:"
 	@echo "   ./tls_client"
 	@echo ""
 	@echo "Files generated:"
+	@echo "   - Keyless Demo: ./keyless_demo"
 	@echo "   - TLS Server: ./tls_server"
 	@echo "   - TLS Client: ./tls_client"
 	@echo "   - TEE Test: ./test_tee"
@@ -123,6 +138,7 @@ help:
 	@echo "  help         - Show this help message"
 	@echo ""
 	@echo "Individual targets:"
+	@echo "  keyless_demo - Build keyless concept demonstration"
 	@echo "  tls_server   - Build TLS server"
 	@echo "  tls_client   - Build keyless TLS client"
 	@echo "  test_tee     - Build TEE test program"
@@ -135,4 +151,5 @@ help:
 
 # 添加依赖关系
 $(SRC_DIR)/keyless_provider.o: $(TEE_MOCK_H)
-tls_client: $(TEE_MOCK_H) $(KEYLESS_PROVIDER_H)
+$(SRC_DIR)/keyless_ssl_callback.o: $(TEE_MOCK_H)
+tls_client: $(TEE_MOCK_H) $(KEYLESS_SSL_CALLBACK_H)

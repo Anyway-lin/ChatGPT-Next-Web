@@ -9,7 +9,7 @@
 #include <openssl/err.h>
 #include <openssl/x509.h>
 #include <openssl/provider.h>
-#include "keyless_provider.h"
+#include "keyless_ssl_callback.h"
 #include "tee_mock.h"
 
 #define SERVER_PORT 8443
@@ -96,40 +96,26 @@ static SSL_CTX* create_keyless_ssl_context(const char *device_key_path, const ch
         return NULL;
     }
     
-    printf("TEE mock environment initialized successfully\n");
-    
-    // 加载设备证书
-    printf("Loading device certificate: %s\n", device_cert_path);
-    if (SSL_CTX_use_certificate_file(ctx, device_cert_path, SSL_FILETYPE_PEM) <= 0) {
-        fprintf(stderr, "Failed to load device certificate\n");
-        print_ssl_error();
+    // 初始化keyless SSL回调系统
+    printf("Initializing keyless SSL callback system...\n");
+    if (keyless_ssl_callback_init(device_key_path, device_cert_path) != 0) {
+        fprintf(stderr, "Failed to initialize keyless SSL callback system\n");
         TeeCleanup();
         SSL_CTX_free(ctx);
         return NULL;
     }
     
-    // 为了简化演示，我们直接使用设备私钥
-    // 在真实环境中，这里会使用TEE provider来处理私钥操作
-    printf("Loading device private key for demonstration...\n");
-    if (SSL_CTX_use_PrivateKey_file(ctx, device_key_path, SSL_FILETYPE_PEM) <= 0) {
-        fprintf(stderr, "Failed to load device private key\n");
-        print_ssl_error();
+    // 设置keyless SSL回调
+    printf("Setting keyless SSL callbacks...\n");
+    if (keyless_ssl_set_callback(ctx) != 0) {
+        fprintf(stderr, "Failed to set keyless SSL callbacks\n");
+        keyless_ssl_callback_cleanup();
         TeeCleanup();
         SSL_CTX_free(ctx);
         return NULL;
     }
     
-    // 验证证书和私钥是否匹配
-    printf("Checking certificate and private key compatibility...\n");
-    if (!SSL_CTX_check_private_key(ctx)) {
-        fprintf(stderr, "Certificate and private key do not match\n");
-        print_ssl_error();
-        TeeCleanup();
-        SSL_CTX_free(ctx);
-        return NULL;
-    } else {
-        printf("Certificate and private key compatibility check passed\n");
-    }
+    printf("Keyless SSL callback system initialized - certificate and private key operations will use TEE\n");
     
     // 设置服务器证书验证
     SSL_CTX_set_verify(ctx, SSL_VERIFY_PEER, verify_callback);
@@ -293,6 +279,7 @@ int main(int argc, char *argv[]) {
     SSL_free(ssl);
     close(sockfd);
     SSL_CTX_free(ctx);
+    keyless_ssl_callback_cleanup();
     TeeCleanup();
     
     printf("TLS client with TEE mock completed successfully!\n");
