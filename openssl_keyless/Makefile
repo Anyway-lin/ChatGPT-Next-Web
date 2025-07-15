@@ -12,10 +12,12 @@ HEADERS = tee_sign.h keyless_ssl.h
 # 主要目标
 TARGET = test_keyless
 DEMO = demo
+TLS_DEMO = tls_handshake_demo
+SIMPLE_TLS = simple_tls_demo
 LIBRARY = libkeyless.so
 
 # 默认目标
-all: $(TARGET) $(DEMO) $(LIBRARY)
+all: $(TARGET) $(DEMO) $(TLS_DEMO) $(SIMPLE_TLS) $(LIBRARY)
 
 # 编译测试程序
 $(TARGET): $(OBJECTS)
@@ -28,6 +30,18 @@ $(DEMO): demo.o tee_sign.o keyless_ssl.o
 	@echo "Linking demo program..."
 	$(CC) -o $@ $^ $(LDFLAGS)
 	@echo "Demo program built successfully: $(DEMO)"
+
+# 编译TLS握手演示程序
+$(TLS_DEMO): tls_handshake_demo.o tee_sign.o keyless_ssl.o
+	@echo "Linking TLS handshake demo program..."
+	$(CC) -o $@ $^ $(LDFLAGS)
+	@echo "TLS demo program built successfully: $(TLS_DEMO)"
+
+# 编译简化TLS演示程序
+$(SIMPLE_TLS): simple_tls_demo.o tee_sign.o keyless_ssl.o
+	@echo "Linking simple TLS demo program..."
+	$(CC) -o $@ $^ $(LDFLAGS)
+	@echo "Simple TLS demo program built successfully: $(SIMPLE_TLS)"
 
 # 编译共享库
 $(LIBRARY): tee_sign.o keyless_ssl.o
@@ -54,6 +68,16 @@ test-verbose: $(TARGET)
 run-demo: $(DEMO)
 	@echo "Running keyless SSL demo..."
 	./$(DEMO)
+
+# 运行TLS握手演示程序
+run-tls-demo: $(TLS_DEMO)
+	@echo "Running keyless TLS handshake demo..."
+	./$(TLS_DEMO)
+
+# 运行简化TLS演示程序
+run-simple-tls: $(SIMPLE_TLS)
+	@echo "Running simple keyless TLS demo..."
+	./$(SIMPLE_TLS)
 
 # 安装库文件
 install: $(LIBRARY)
@@ -82,7 +106,7 @@ check-deps:
 # 清理编译文件
 clean:
 	@echo "Cleaning build files..."
-	rm -f $(OBJECTS) demo.o $(TARGET) $(DEMO) $(LIBRARY)
+	rm -f $(OBJECTS) demo.o tls_handshake_demo.o simple_tls_demo.o $(TARGET) $(DEMO) $(TLS_DEMO) $(SIMPLE_TLS) $(LIBRARY)
 	rm -f *.so *.a
 	@echo "Clean completed"
 
@@ -90,19 +114,23 @@ clean:
 help:
 	@echo "OpenSSL Keyless Mechanism Build System"
 	@echo "Available targets:"
-	@echo "  all          - Build test program and shared library (default)"
-	@echo "  test         - Build and run tests"
-	@echo "  test-verbose - Build and run tests with verbose output"
-	@echo "  install      - Install library to system"
-	@echo "  uninstall    - Remove library from system"
-	@echo "  check-deps   - Check build dependencies"
-	@echo "  clean        - Remove build files"
-	@echo "  help         - Show this help message"
+	@echo "  all             - Build all programs and shared library (default)"
+	@echo "  test            - Build and run tests"
+	@echo "  test-verbose    - Build and run tests with verbose output"
+	@echo "  run-demo        - Run basic keyless SSL demo"
+	@echo "  run-tls-demo    - Run complete TLS handshake demo"
+	@echo "  run-simple-tls  - Run simplified TLS handshake demo"
+	@echo "  install         - Install library to system"
+	@echo "  uninstall       - Remove library from system"
+	@echo "  check-deps      - Check build dependencies"
+	@echo "  clean           - Remove build files"
+	@echo "  help            - Show this help message"
 	@echo ""
 	@echo "Example usage:"
-	@echo "  make all     # Build everything"
-	@echo "  make test    # Run tests"
-	@echo "  make clean   # Clean up"
+	@echo "  make all            # Build everything"
+	@echo "  make run-tls-demo   # Run TLS handshake demo"
+	@echo "  make test           # Run tests"
+	@echo "  make clean          # Clean up"
 
 # 调试构建
 debug: CFLAGS += -DDEBUG -g3
