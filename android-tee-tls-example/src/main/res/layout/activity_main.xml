@@ -1,0 +1,61 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:padding="16dp"
+    tools:context=".MainActivity">
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="TEE TLS引擎示例"
+        android:textSize="24sp"
+        android:textStyle="bold"
+        android:gravity="center"
+        android:layout_marginBottom="24dp" />
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="此应用演示如何在Android中使用OkHttp实现自定义TLS引擎，其中签名操作通过TEE接口完成。"
+        android:textSize="16sp"
+        android:layout_marginBottom="24dp" />
+
+    <Button
+        android:id="@+id/testButton"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="测试TEE HTTPS请求"
+        android:textSize="18sp"
+        android:layout_marginBottom="24dp" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <TextView
+            android:id="@+id/statusTextView"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="等待初始化..."
+            android:textSize="14sp"
+            android:background="@android:color/black"
+            android:textColor="@android:color/white"
+            android:padding="12dp"
+            android:fontFamily="monospace" />
+
+    </ScrollView>
+
+    <TextView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:text="注意：此示例需要支持TEE的Android设备。在不支持TEE的设备上，将使用Android KeyStore作为安全存储。"
+        android:textSize="12sp"
+        android:textStyle="italic"
+        android:layout_marginTop="16dp"
+        android:gravity="center" />
+
+</LinearLayout>
